@@ -1,0 +1,327 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MercuryGate-inspired color scheme and styling */
+:root {
+  --mg-primary: #1e3a8a; /* Deep blue */
+  --mg-secondary: #3b82f6; /* Bright blue */
+  --mg-accent: #0ea5e9; /* Sky blue */
+  --mg-success: #10b981; /* Green */
+  --mg-warning: #f59e0b; /* Amber */
+  --mg-danger: #ef4444; /* Red */
+  --mg-dark: #1f2937; /* Dark gray */
+  --mg-light: #f3f4f6; /* Light gray */
+  --mg-border: #d1d5db; /* Gray border */
+  --mg-hover: #eff6ff; /* Very light blue */
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f9fafb;
+}
+
+/* MercuryGate ezVision-inspired control tower table */
+.control-tower-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  background: white;
+  border: 1px solid var(--mg-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.control-tower-table th {
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  color: var(--mg-dark);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 2px solid var(--mg-border);
+}
+
+.control-tower-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.control-tower-table tr:last-child td {
+  border-bottom: none;
+}
+
+.control-tower-table tbody tr:hover {
+  background-color: var(--mg-hover);
+  cursor: pointer;
+}
+
+/* Stacked thematic columns (MercuryGate style) */
+.stacked-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stacked-column .primary {
+  font-weight: 600;
+  color: #111827;
+}
+
+.stacked-column .secondary {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Status badges with MercuryGate color scheme */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-badge.scheduled { background: #dbeafe; color: #1e40af; }
+.status-badge.in-transit { background: #fef3c7; color: #92400e; }
+.status-badge.delivered { background: #d1fae5; color: #065f46; }
+.status-badge.cancelled { background: #fee2e2; color: #991b1b; }
+.status-badge.critical { background: #fecaca; color: #991b1b; }
+.status-badge.high { background: #fed7aa; color: #9a3412; }
+.status-badge.medium { background: #fef3c7; color: #92400e; }
+.status-badge.low { background: #e0e7ff; color: #3730a3; }
+.status-badge.active { background: #d1fae5; color: #065f46; }
+.status-badge.stopped { background: #f3f4f6; color: #4b5563; }
+.status-badge.paused { background: #fef3c7; color: #92400e; }
+
+/* MercuryGate-style left navigation */
+.mg-sidebar {
+  width: 220px;
+  background: linear-gradient(to bottom, #1e3a8a, #1e40af);
+  color: white;
+  min-height: 100vh;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.mg-sidebar-item {
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #e0e7ff;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.mg-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.mg-sidebar-item.active {
+  background: rgba(255, 255, 255, 0.15);
+  border-left-color: #60a5fa;
+  color: white;
+}
+
+/* MercuryGate-style KPI cards */
+.kpi-card {
+  background: white;
+  border: 1px solid var(--mg-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+  cursor: pointer;
+  border-color: var(--mg-accent);
+}
+
+.kpi-card .kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.kpi-card .kpi-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.kpi-card .kpi-change {
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.kpi-card .kpi-change.positive { color: var(--mg-success); }
+.kpi-card .kpi-change.negative { color: var(--mg-danger); }
+
+/* Priority indicators */
+.priority-indicator {
+  width: 4px;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.priority-indicator.critical { background: #ef4444; }
+.priority-indicator.high { background: #f97316; }
+.priority-indicator.medium { background: #f59e0b; }
+.priority-indicator.low { background: #3b82f6; }
+
+/* Contextual hover tooltips */
+.contextual-hover {
+  position: relative;
+}
+
+.contextual-hover:hover .hover-card {
+  display: block;
+}
+
+.hover-card {
+  display: none;
+  position: absolute;
+  z-index: 50;
+  background: white;
+  border: 1px solid var(--mg-border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  font-size: 0.875rem;
+}
+
+/* Control tower header */
+.control-tower-header {
+  background: linear-gradient(135deg, var(--mg-primary) 0%, var(--mg-secondary) 100%);
+  color: white;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Action buttons */
+.mg-button {
+  padding: 0.625rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mg-button-primary {
+  background: var(--mg-secondary);
+  color: white;
+}
+
+.mg-button-primary:hover {
+  background: var(--mg-primary);
+  box-shadow: 0 4px 8px rgba(30, 58, 138, 0.3);
+}
+
+.mg-button-secondary {
+  background: white;
+  color: var(--mg-secondary);
+  border: 1px solid var(--mg-border);
+}
+
+.mg-button-secondary:hover {
+  background: var(--mg-hover);
+  border-color: var(--mg-secondary);
+}
+
+/* Data visualization bars */
+.data-bar {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.data-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--mg-accent), var(--mg-secondary));
+  transition: width 0.3s ease;
+}
+
+/* Alert banners */
+.alert-banner {
+  padding: 1rem 1.5rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.alert-banner.critical {
+  background: #fef2f2;
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+}
+
+.alert-banner.warning {
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  color: #92400e;
+}
+
+.alert-banner.info {
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  color: #1e40af;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
