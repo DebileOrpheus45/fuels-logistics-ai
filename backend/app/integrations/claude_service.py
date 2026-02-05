@@ -16,7 +16,7 @@ class ClaudeService:
 
     def __init__(self):
         self.client = Anthropic(api_key=settings.anthropic_api_key)
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-4-5"  # Claude Sonnet 4.5 (2026 recommended model)
 
     def chat(
         self,

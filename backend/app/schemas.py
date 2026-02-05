@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.models import (
     LoadStatus, AgentStatus, EscalationPriority,
     EscalationStatus, IssueType, ActivityType,
@@ -169,6 +169,11 @@ class LoadResponse(LoadBase):
     current_eta: Optional[datetime] = None
     last_eta_update: Optional[datetime] = None
     last_email_sent: Optional[datetime] = None
+    notes: List[Dict[str, Any]] = Field(default_factory=list)  # Collaborative notes (human + AI)
+    tracking_points: List[Dict[str, Any]] = Field(default_factory=list)  # GPS tracking history
+    origin_address: Optional[str] = None
+    destination_address: Optional[str] = None
+    shipped_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Cache - Fuels Logistics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Browser Cache</h1>
+        <p>Click the button below to clear all cached data and force fresh data fetch.</p>
+
+        <button onclick="clearAllCache()">Clear All Cache & Storage</button>
+        <button onclick="goToDashboard()">Go to Dashboard</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function clearAllCache() {
+            const status = document.getElementById('status');
+
+            try {
+                // Clear localStorage
+                localStorage.clear();
+
+                // Clear sessionStorage
+                sessionStorage.clear();
+
+                // Clear IndexedDB (React Query may use this)
+                if (window.indexedDB) {
+                    window.indexedDB.databases().then(databases => {
+                        databases.forEach(db => {
+                            window.indexedDB.deleteDatabase(db.name);
+                        });
+                    });
+                }
+
+                // Clear Service Worker caches
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => {
+                            caches.delete(name);
+                        });
+                    });
+                }
+
+                status.className = 'success';
+                status.textContent = '✅ All cache cleared successfully! Now reload the page or click "Go to Dashboard".';
+
+            } catch (error) {
+                status.className = 'info';
+                status.textContent = `⚠️ ${error.message}. Try manually refreshing with Ctrl+Shift+R`;
+            }
+        }
+
+        function goToDashboard() {
+            // Add timestamp to URL to bust cache
+            window.location.href = '/?t=' + Date.now();
+        }
+
+        // Auto-clear on page load
+        window.addEventListener('load', () => {
+            const status = document.getElementById('status');
+            status.className = 'info';
+            status.textContent = 'ℹ️ Click the button above to clear all cached data.';
+        });
+    </script>
+</body>
+</html>

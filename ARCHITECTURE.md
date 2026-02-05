@@ -1,7 +1,7 @@
 # Fuels Logistics AI Coordinator - System Architecture
 
-**Last Updated:** January 18, 2026
-**Version:** 0.1.0 (MVP)
+**Last Updated:** January 24, 2026
+**Version:** 0.3.0 (MVP+)
 
 ---
 
@@ -52,8 +52,10 @@ The Fuels Logistics AI Coordinator is an intelligent platform designed to automa
 - **Styling:** TailwindCSS
 - **Icons:** Lucide React
 - **HTTP Client:** Axios
+- **Maps:** Leaflet.js with react-leaflet v4.2.1
+- **Map Tiles:** OpenStreetMap
 - **Port:** 5173
-- **Style:** Modern, card-based SaaS interface
+- **Style:** Modern, card-based SaaS interface with interactive GPS tracking
 
 #### MGClone_v1 (MercuryGate-inspired - `MGClone_v1/`)
 - **Framework:** React 18 with Vite
@@ -207,6 +209,11 @@ Fuel shipments/deliveries in the system.
 | `driver_name` | VARCHAR(255) | |
 | `driver_phone` | VARCHAR(50) | |
 | `last_email_sent` | DATETIME | Last ETA request timestamp |
+| **`tracking_points`** | **JSON** | **GPS tracking data array** - **NEW** |
+| **`origin_address`** | **VARCHAR(500)** | **Full origin address** - **NEW** |
+| **`destination_address`** | **VARCHAR(500)** | **Full destination address** - **NEW** |
+| **`shipped_at`** | **DATETIME** | **Shipment departure time** - **NEW** |
+| **`notes`** | **JSON** | **Collaborative notes array (AI + human)** - **NEW** |
 | `created_at` | DATETIME | |
 | `updated_at` | DATETIME | |
 
@@ -215,6 +222,36 @@ Fuel shipments/deliveries in the system.
 **Computed Properties (Python `@property`):**
 - `is_eta_stale` - True if `last_eta_update_at` is older than threshold
 - `eta_staleness_hours` - Hours since last ETA update
+
+**GPS Tracking Points Format (JSON):**
+```json
+[
+  {
+    "lat": 33.7490,
+    "lng": -84.3880,
+    "timestamp": "2024-01-24T08:00:00",
+    "speed": 65
+  }
+]
+```
+
+**Collaborative Notes Format (JSON):**
+```json
+[
+  {
+    "author": "Agent 1",
+    "type": "ai",
+    "text": "Requested ETA update from carrier",
+    "timestamp": "2024-01-24T09:00:00"
+  },
+  {
+    "author": "John Doe",
+    "type": "human",
+    "text": "Carrier confirmed 2pm arrival",
+    "timestamp": "2024-01-24T09:15:00"
+  }
+]
+```
 
 ---
 
@@ -609,15 +646,16 @@ frontend/src/
 
 **Utility Components:**
 - `FuelGauge` - Circular gauge showing tank fill percentage
-- `StatCard` - Clickable dashboard stat cards
+- `StatCard` - Clickable dashboard stat cards (compact design)
 - `LoadCard` - Display individual load with status badge
 - `SiteCard` - Site inventory card with edit button and notes display
 - `EscalationBanner` - Alert banner for critical escalations
+- **`LoadDetailsSidebar`** - **Interactive slide-in panel with GPS map and load details** - **NEW**
 
 **Tab Components:**
 - `DashboardOverview` - Main stats and recent activity
 - `SitesTab` - Grid of site cards with filtering (All, At Risk, Critical)
-- `LoadsTab` - List of all loads with status filtering
+- `LoadsTab` - **Table with Excel-style sorting, search, and click-through to sidebar** - **ENHANCED**
 - `AgentMonitorTab` - HITL supervision interface with activity logs
 - `EscalationsTab` - Escalation management
 
@@ -627,6 +665,21 @@ frontend/src/
 - `SiteDetailsModal` - Edit site constraints and notes
 - `BatchUploadModal` - CSV upload with preview and validation
 - `AgentAssignmentModal` - Multi-select site assignment to agents
+
+**Table Components:**
+- **`LoadsTable`** - **Sortable/searchable loads table with customer badges** - **ENHANCED**
+  - Excel-style column sorting (click headers to toggle asc/desc)
+  - Multi-field search (PO#, carrier, destination, status, volume)
+  - Customer badge display (Stark/Wayne/Luthor)
+  - Click row to open LoadDetailsSidebar
+  - Clear filters button
+
+**Interactive Features:**
+- **GPS Route Visualization** using Leaflet.js and react-leaflet v4.2.1
+- **OpenStreetMap** tile layer for base maps
+- **Polyline routes** showing truck travel paths
+- **Clickable markers** with speed and timestamp popups
+- **Animated refresh button** tied to React Query isFetching states
 
 ---
 

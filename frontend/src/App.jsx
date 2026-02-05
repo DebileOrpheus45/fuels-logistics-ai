@@ -1,5 +1,8 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import {
   getDashboardStats,
   getSites,
@@ -16,7 +19,8 @@ import {
   assignSitesToAgent,
   getCustomers,
   getErpSources,
-  getErpTemplate
+  getErpTemplate,
+  addNoteToLoad
 } from './api/client'
 import {
   Fuel,
@@ -48,7 +52,22 @@ import {
   Upload,
   Settings,
   StickyNote,
-  Users
+  Users,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  Send,
+  MapPin,
+  Navigation,
+  Phone,
+  Package,
+  Calendar,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Search,
+  XCircle
 } from 'lucide-react'
 
 // ============== Login Page ==============
@@ -336,8 +355,8 @@ function EscalationBanner({ escalations, onViewAll }) {
   if (!escalations?.length) return null
 
   return (
-    <div className={`mb-4 p-4 rounded-lg flex items-center justify-between ${
-      criticalCount > 0 ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'
+    <div className={`mb-4 p-4 rounded-lg flex items-center justify-between animate-slideInRight ${
+      criticalCount > 0 ? 'bg-red-600 text-white animate-pulseGlow' : 'bg-orange-500 text-white'
     }`}>
       <div className="flex items-center gap-3">
         <Bell className="h-6 w-6 animate-bounce" />
@@ -354,7 +373,7 @@ function EscalationBanner({ escalations, onViewAll }) {
       </div>
       <button
         onClick={onViewAll}
-        className="flex items-center gap-1 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition"
+        className="flex items-center gap-1 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-smooth hover:scale-105"
       >
         View All <ChevronRight className="h-4 w-4" />
       </button>
@@ -1703,8 +1722,427 @@ function AgentManagementPanel({ agents, sites }) {
   )
 }
 
+// ============== Load Details Sidebar ==============
+function LoadDetailsSidebar({ load: initialLoad, onClose }) {
+  if (!initialLoad) return null
+
+  // BYPASS CACHE - Fetch fresh data directly from API
+  const [freshLoad, setFreshLoad] = useState(initialLoad)
+
+  useEffect(() => {
+    // Fetch fresh data on mount
+    fetch('http://localhost:8000/api/loads/active')
+      .then(res => res.json())
+      .then(loads => {
+        const fresh = loads.find(l => l.id === initialLoad.id)
+        console.log('🔥 FRESH LOAD DATA FROM API:', {
+          po: fresh?.po_number,
+          tracking_count: fresh?.tracking_points?.length,
+          origin: fresh?.origin_address,
+          dest: fresh?.destination_address,
+          raw: fresh
+        })
+        if (fresh) {
+          setFreshLoad(fresh)
+        }
+      })
+      .catch(err => console.error('Failed to fetch fresh load:', err))
+  }, [initialLoad.id])
+
+  const load = freshLoad
+
+  // Debug: Log tracking data
+  useEffect(() => {
+    console.log('LoadDetailsSidebar - Load Data:', {
+      po_number: load.po_number,
+      status: load.status,
+      tracking_points_count: load.tracking_points?.length || 0,
+      has_tracking_points: !!load.tracking_points,
+      first_point: load.tracking_points?.[0],
+      origin_address: load.origin_address,
+      destination_address: load.destination_address,
+      all_load_keys: Object.keys(load)
+    })
+  }, [load])
+
+  // Fix Leaflet default icon issue
+  useEffect(() => {
+    delete L.Icon.Default.prototype._getIconUrl
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    })
+  }, [])
+
+  // Calculate center point between origin and destination
+  const getMapCenter = () => {
+    if (load.tracking_points?.length > 0) {
+      const lastPoint = load.tracking_points[load.tracking_points.length - 1]
+      return [lastPoint.lat, lastPoint.lng]
+    }
+    return [33.7490, -84.3880] // Default to Atlanta
+  }
+
+  const getStatusColor = () => {
+    switch (load.status) {
+      case 'in_transit': return 'text-blue-600 bg-blue-100'
+      case 'scheduled': return 'text-gray-600 bg-gray-100'
+      case 'delayed': return 'text-red-600 bg-red-100'
+      case 'delivered': return 'text-green-600 bg-green-100'
+      default: return 'text-gray-600 bg-gray-100'
+    }
+  }
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A'
+    return new Date(date).toLocaleString()
+  }
+
+  // Create route line from tracking points
+  const routeLine = load.tracking_points?.map(p => [p.lat, p.lng]) || []
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black bg-opacity-30 z-40 animate-fadeIn"
+        onClick={onClose}
+      />
+
+      {/* Sidebar */}
+      <div className="fixed right-0 top-0 h-full w-1/3 bg-white shadow-2xl z-50 flex flex-col animate-slideInRight">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-6 flex-shrink-0 z-20">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-2xl font-bold">Load Details</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <p className="text-blue-100 text-lg font-mono">{load.po_number}</p>
+            {load.destination_site?.customer && (
+              <span className={`px-2.5 py-1 text-xs font-semibold rounded border ${
+                load.destination_site.customer === 'stark_industries'
+                  ? 'bg-red-100 text-red-700 border-red-200'
+                  : load.destination_site.customer === 'wayne_enterprises'
+                  ? 'bg-gray-800 text-white border-gray-900'
+                  : 'bg-green-100 text-green-700 border-green-200'
+              }`}>
+                {load.destination_site.customer === 'stark_industries' ? 'Stark' :
+                 load.destination_site.customer === 'wayne_enterprises' ? 'Wayne' :
+                 'Luthor'}
+              </span>
+            )}
+          </div>
+          <div>
+            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor()}`}>
+              {load.status?.replace(/_/g, ' ').toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Current Status & ETA */}
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-5 border border-blue-200">
+            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-600" />
+              Current Status
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Current ETA:</span>
+                <span className="font-bold text-gray-900">{formatDate(load.current_eta)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Last Update:</span>
+                <span className="text-sm text-gray-500">{formatDate(load.last_eta_update)}</span>
+              </div>
+              {load.shipped_at && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Shipped:</span>
+                  <span className="text-sm text-gray-500">{formatDate(load.shipped_at)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Route Map */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-green-600" />
+                Route Tracking {load.tracking_points?.length > 0 && `(${load.tracking_points.length} points)`}
+              </h3>
+            </div>
+            {load.tracking_points?.length > 0 ? (
+              <div className="h-64" style={{ position: 'relative', zIndex: 1 }}>
+                <MapContainer
+                  key={load.id}
+                  center={getMapCenter()}
+                  zoom={6}
+                  style={{ height: '100%', width: '100%', zIndex: 1 }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  />
+
+                  {/* Route line */}
+                  {routeLine.length > 0 && (
+                    <Polyline positions={routeLine} color="blue" weight={3} opacity={0.7} />
+                  )}
+
+                  {/* Tracking points */}
+                  {load.tracking_points.map((point, idx) => (
+                    <Marker key={idx} position={[point.lat, point.lng]}>
+                      <Popup>
+                        <div className="text-sm">
+                          <p className="font-bold">Tracking Point {idx + 1}</p>
+                          <p>Time: {new Date(point.timestamp).toLocaleString()}</p>
+                          <p>Speed: {point.speed} mph</p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center bg-gray-50">
+                <div className="text-center text-gray-500">
+                  <MapPin className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No tracking data available yet</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Origin & Destination */}
+          <div className="space-y-3">
+            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-green-600 rounded-lg">
+                  <Navigation className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Origin</p>
+                  <p className="text-sm text-gray-600">{load.origin_terminal}</p>
+                  <p className="text-xs text-gray-500 mt-1">{load.origin_address || 'Address not available'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <ArrowRight className="h-6 w-6 text-gray-400" />
+            </div>
+
+            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-red-600 rounded-lg">
+                  <MapPin className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Destination</p>
+                  <p className="text-sm text-gray-600">
+                    {load.destination_site?.consignee_name || 'N/A'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">{load.destination_address || 'Address not available'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Carrier & Driver Info */}
+          <div className="bg-purple-50 rounded-xl p-5 border border-purple-200">
+            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Truck className="h-5 w-5 text-purple-600" />
+              Carrier Information
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Carrier:</span>
+                <span className="font-semibold text-gray-900">{load.carrier?.carrier_name || 'N/A'}</span>
+              </div>
+              {load.driver_name && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Driver:</span>
+                  <span className="font-semibold text-gray-900">{load.driver_name}</span>
+                </div>
+              )}
+              {load.driver_phone && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Contact:</span>
+                  <a href={`tel:${load.driver_phone}`} className="flex items-center gap-1 text-blue-600 hover:text-blue-700">
+                    <Phone className="h-4 w-4" />
+                    {load.driver_phone}
+                  </a>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Macropoint:</span>
+                <span className={`text-sm px-2 py-1 rounded ${load.has_macropoint_tracking ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {load.has_macropoint_tracking ? 'Active' : 'Not Active'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Product Details */}
+          <div className="bg-orange-50 rounded-xl p-5 border border-orange-200">
+            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Package className="h-5 w-5 text-orange-600" />
+              Product Details
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Product Type:</span>
+                <span className="font-semibold text-gray-900 capitalize">{load.product_type || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Volume:</span>
+                <span className="font-semibold text-gray-900">{load.volume?.toLocaleString()} gal</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">TMS Load #:</span>
+                <span className="text-sm text-gray-600 font-mono">{load.tms_load_number || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Collaborative Notes */}
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border-2 border-purple-200">
+            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-purple-600" />
+              Collaborative Notes {load.notes?.length > 0 && `(${load.notes.length})`}
+            </h3>
+            <div className="bg-white rounded-lg p-3 border border-purple-100 shadow-inner max-h-80 overflow-y-auto custom-scrollbar">
+              {load.notes?.length > 0 ? (
+                <div className="space-y-3">
+                  {load.notes.map((note, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg shadow-sm ${
+                        note.type === 'ai'
+                          ? 'bg-gradient-to-r from-purple-50 to-purple-100 border-l-4 border-purple-400'
+                          : 'bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        {note.type === 'ai' ? (
+                          <Bot className="h-4 w-4 text-purple-600" />
+                        ) : (
+                          <User className="h-4 w-4 text-green-600" />
+                        )}
+                        <span className={`text-xs font-bold ${
+                          note.type === 'ai' ? 'text-purple-700' : 'text-green-700'
+                        }`}>
+                          {note.author}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-auto">
+                          {new Date(note.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-800 leading-relaxed">{note.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No notes yet</p>
+                  <p className="text-xs mt-1">Add notes from the table view</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200">
+            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-gray-600" />
+              Timeline
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">Created</p>
+                  <p className="text-xs text-gray-500">{formatDate(load.created_at)}</p>
+                </div>
+              </div>
+              {load.shipped_at && (
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">Shipped</p>
+                    <p className="text-xs text-gray-500">{formatDate(load.shipped_at)}</p>
+                  </div>
+                </div>
+              )}
+              {load.current_eta && (
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">Expected Delivery</p>
+                    <p className="text-xs text-gray-500">{formatDate(load.current_eta)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ============== Loads Table ==============
-function LoadsTable({ loads, statusFilter = 'all', onFilterChange }) {
+function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }) {
+  const queryClient = useQueryClient()
+  const [expandedLoadId, setExpandedLoadId] = useState(null)
+  const [noteText, setNoteText] = useState('')
+  const [noteAuthor, setNoteAuthor] = useState('')
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const addNoteMutation = useMutation({
+    mutationFn: ({ loadId, text, author }) => addNoteToLoad(loadId, text, author, 'human'),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['loads'])
+      setNoteText('')
+      setNoteAuthor('')
+    }
+  })
+
+  // Sorting function
+  const handleSort = (key) => {
+    let direction = 'asc'
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc'
+    }
+    setSortConfig({ key, direction })
+  }
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return null // Don't show any icon on unsorted columns
+    }
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp className="h-4 w-4 text-gray-700" />
+      : <ArrowDown className="h-4 w-4 text-gray-700" />
+  }
+
+  const clearAllFilters = () => {
+    setSortConfig({ key: null, direction: 'asc' })
+    setSearchQuery('')
+    onFilterChange?.('all')
+  }
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'in_transit':
@@ -1728,16 +2166,101 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange }) {
     }
   }
 
-  // Filter loads based on status
-  const filteredLoads = loads?.filter(load => {
-    if (statusFilter === 'all') return true
-    return load.status?.toLowerCase() === statusFilter.toLowerCase()
-  })
+  // Filter, search, and sort loads
+  const filteredAndSortedLoads = useMemo(() => {
+    // First filter by status
+    let filtered = loads?.filter(load => {
+      if (statusFilter === 'all') return true
+      return load.status?.toLowerCase() === statusFilter.toLowerCase()
+    }) || []
+
+    // Then filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(load => {
+        return (
+          load.po_number?.toLowerCase().includes(query) ||
+          load.carrier?.carrier_name?.toLowerCase().includes(query) ||
+          load.destination_site?.consignee_code?.toLowerCase().includes(query) ||
+          load.destination_site?.consignee_name?.toLowerCase().includes(query) ||
+          load.status?.toLowerCase().includes(query) ||
+          load.volume?.toString().includes(query)
+        )
+      })
+    }
+
+    // Then sort
+    if (sortConfig.key) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue
+
+        switch (sortConfig.key) {
+          case 'po_number':
+            aValue = a.po_number || ''
+            bValue = b.po_number || ''
+            break
+          case 'carrier':
+            aValue = a.carrier?.carrier_name || ''
+            bValue = b.carrier?.carrier_name || ''
+            break
+          case 'destination':
+            aValue = a.destination_site?.consignee_code || ''
+            bValue = b.destination_site?.consignee_code || ''
+            break
+          case 'volume':
+            aValue = a.volume || 0
+            bValue = b.volume || 0
+            break
+          case 'eta':
+            aValue = a.current_eta ? new Date(a.current_eta).getTime() : 0
+            bValue = b.current_eta ? new Date(b.current_eta).getTime() : 0
+            break
+          case 'status':
+            aValue = a.status || ''
+            bValue = b.status || ''
+            break
+          default:
+            return 0
+        }
+
+        // Compare values
+        if (typeof aValue === 'string') {
+          const comparison = aValue.localeCompare(bValue)
+          return sortConfig.direction === 'asc' ? comparison : -comparison
+        } else {
+          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
+        }
+      })
+    }
+
+    return filtered
+  }, [loads, statusFilter, sortConfig, searchQuery])
+
+  const handleAddNote = (loadId) => {
+    if (!noteText.trim() || !noteAuthor.trim()) return
+    addNoteMutation.mutate({ loadId, text: noteText, author: noteAuthor })
+  }
+
+  const getCustomerBadge = (customer) => {
+    const customerConfig = {
+      'stark_industries': { label: 'Stark', color: 'bg-red-100 text-red-700 border-red-200' },
+      'wayne_enterprises': { label: 'Wayne', color: 'bg-gray-800 text-white border-gray-900' },
+      'luthor_corp': { label: 'Luthor', color: 'bg-green-100 text-green-700 border-green-200' }
+    }
+
+    const config = customerConfig[customer] || { label: customer, color: 'bg-gray-100 text-gray-700 border-gray-200' }
+
+    return (
+      <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${config.color}`}>
+        {config.label}
+      </span>
+    )
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Truck className="h-6 w-6" />
             <h3 className="text-lg font-bold">Active Shipments</h3>
@@ -1772,48 +2295,248 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange }) {
             </div>
           )}
         </div>
+
+        {/* Search and Clear Filters Row */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-300" />
+            <input
+              type="text"
+              placeholder="Search by PO#, carrier, destination, status..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:bg-white/20 focus:border-white/40 transition"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-200 hover:text-white transition"
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {(sortConfig.key || searchQuery || statusFilter !== 'all') && (
+            <button
+              onClick={clearAllFilters}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition text-sm font-medium"
+            >
+              <XCircle className="h-4 w-4" />
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PO #</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Carrier</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destination</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Volume</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ETA</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12"></th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                onClick={() => handleSort('po_number')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>PO #</span>
+                  {getSortIcon('po_number')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                onClick={() => handleSort('carrier')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Carrier</span>
+                  {getSortIcon('carrier')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                onClick={() => handleSort('destination')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Destination</span>
+                  {getSortIcon('destination')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                onClick={() => handleSort('volume')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Volume</span>
+                  {getSortIcon('volume')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                onClick={() => handleSort('eta')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>ETA</span>
+                  {getSortIcon('eta')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                onClick={() => handleSort('status')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Status</span>
+                  {getSortIcon('status')}
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredLoads?.length === 0 && (
+            {filteredAndSortedLoads?.length === 0 && (
               <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                   No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} loads found
                 </td>
               </tr>
             )}
-            {filteredLoads?.map((load) => (
-              <tr key={load.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  {load.po_number}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {load.carrier?.carrier_name || 'N/A'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {load.destination_site?.consignee_code || 'N/A'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {load.volume?.toLocaleString()} gal
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {load.current_eta ? new Date(load.current_eta).toLocaleString() : 'Pending'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(load.status)}
-                </td>
-              </tr>
+            {filteredAndSortedLoads?.map((load) => (
+              <>
+                <tr
+                  key={load.id}
+                  className="hover:bg-blue-50 transition-smooth cursor-pointer"
+                  onClick={() => onLoadClick?.(load)}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setExpandedLoadId(expandedLoadId === load.id ? null : load.id)}
+                      className="text-gray-400 hover:text-blue-600 transition-smooth"
+                    >
+                      {expandedLoadId === load.id ? (
+                        <ChevronUp className="h-5 w-5" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5" />
+                      )}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        {load.po_number}
+                        {load.notes?.length > 0 && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
+                            <MessageSquare className="h-3 w-3" />
+                            {load.notes.length}
+                          </span>
+                        )}
+                      </div>
+                      {load.destination_site?.customer && (
+                        <div>
+                          {getCustomerBadge(load.destination_site.customer)}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {load.carrier?.carrier_name || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {load.destination_site?.consignee_code || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {load.volume?.toLocaleString()} gal
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {load.current_eta ? new Date(load.current_eta).toLocaleString() : 'Pending'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(load.status)}
+                  </td>
+                </tr>
+                {expandedLoadId === load.id && (
+                  <tr key={`${load.id}-notes`}>
+                    <td colSpan="7" className="px-6 py-4 bg-gray-50 animate-fadeIn">
+                      <div className="space-y-4">
+                        {/* Existing Notes */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Collaborative Notes
+                          </h4>
+                          {load.notes?.length === 0 ? (
+                            <p className="text-sm text-gray-500 italic">No notes yet. Add one below!</p>
+                          ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                              {load.notes?.map((note, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`p-3 rounded-lg border animate-slideInLeft ${
+                                    note.type === 'ai'
+                                      ? 'bg-purple-50 border-purple-200'
+                                      : 'bg-green-50 border-green-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      {note.type === 'ai' ? (
+                                        <Bot className="h-4 w-4 text-purple-600" />
+                                      ) : (
+                                        <User className="h-4 w-4 text-green-600" />
+                                      )}
+                                      <span className={`text-xs font-semibold ${
+                                        note.type === 'ai' ? 'text-purple-700' : 'text-green-700'
+                                      }`}>
+                                        {note.author}
+                                      </span>
+                                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                        note.type === 'ai'
+                                          ? 'bg-purple-200 text-purple-700'
+                                          : 'bg-green-200 text-green-700'
+                                      }`}>
+                                        {note.type === 'ai' ? 'AI Agent' : 'Human'}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(note.timestamp).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-700 ml-6">{note.text}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add Note Form */}
+                        <div className="border-t pt-4">
+                          <h5 className="text-sm font-semibold text-gray-700 mb-2">Add Your Note</h5>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Your name"
+                              value={noteAuthor}
+                              onChange={(e) => setNoteAuthor(e.target.value)}
+                              className="px-3 py-2 border rounded-lg text-sm w-32 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Add a note about this load..."
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && handleAddNote(load.id)}
+                              className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                            <button
+                              onClick={() => handleAddNote(load.id)}
+                              disabled={!noteText.trim() || !noteAuthor.trim() || addNoteMutation.isLoading}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-smooth flex items-center gap-2"
+                            >
+                              <Send className="h-4 w-4" />
+                              Add Note
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
           </tbody>
         </table>
@@ -1872,22 +2595,22 @@ function StatsCard({ title, value, icon: Icon, color = 'blue', onClick, clickabl
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition ${
+      className={`bg-white rounded-lg shadow-md p-4 transition-smooth animate-fadeIn hover-lift ${
         clickable ? 'cursor-pointer hover:ring-2 hover:ring-blue-300' : ''
       }`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+        <div className="flex-1">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-0.5 transition-all duration-300">{value}</p>
         </div>
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${colors[color]}`}>
-          <Icon className="h-6 w-6 text-white" />
+        <div className={`p-2.5 rounded-lg bg-gradient-to-br ${colors[color]} transition-transform duration-300 hover:scale-110`}>
+          <Icon className="h-5 w-5 text-white" />
         </div>
       </div>
       {clickable && (
-        <p className="text-xs text-blue-500 mt-2 flex items-center gap-1">
+        <p className="text-xs text-blue-500 mt-1.5 flex items-center gap-1 animate-fadeIn">
           <Filter className="h-3 w-3" /> Click to filter
         </p>
       )}
@@ -1900,6 +2623,7 @@ function Dashboard({ user, onLogout }) {
   const queryClient = useQueryClient()
   const [selectedEscalation, setSelectedEscalation] = useState(null)
   const [selectedEmail, setSelectedEmail] = useState(null)
+  const [selectedLoad, setSelectedLoad] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [siteFilter, setSiteFilter] = useState('all') // 'all', 'at-risk', 'critical', 'delayed'
   const [customerFilter, setCustomerFilter] = useState('') // filter by customer
@@ -1908,37 +2632,52 @@ function Dashboard({ user, onLogout }) {
   const [showBatchUpload, setShowBatchUpload] = useState(false)
   const [selectedAgentForAssignment, setSelectedAgentForAssignment] = useState(null)
 
-  const { data: stats } = useQuery({
+  const { data: stats, isFetching: isStatsFetching, error: statsError, isLoading: isStatsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
-    queryFn: getDashboardStats
+    queryFn: getDashboardStats,
+    retry: 2
   })
 
-  const { data: sites } = useQuery({
+  const { data: sites, isFetching: isSitesFetching, error: sitesError, isLoading: isSitesLoading } = useQuery({
     queryKey: ['sites'],
-    queryFn: getSites
+    queryFn: getSites,
+    retry: 2
   })
 
-  const { data: customers = [] } = useQuery({
+  const { data: customers = [], isFetching: isCustomersFetching } = useQuery({
     queryKey: ['customers'],
     queryFn: getCustomers
   })
 
-  const { data: loads } = useQuery({
-    queryKey: ['active-loads'],
-    queryFn: getActiveLoads
+  const { data: loads, isFetching: isLoadsFetching, error: loadsError, isLoading: isLoadsLoading } = useQuery({
+    queryKey: ['active-loads-v3-FORCE-REFRESH'], // FORCE NEW CACHE
+    queryFn: async () => {
+      const data = await getActiveLoads()
+      console.log('🚨 LOADS FETCHED FROM API:', {
+        count: data?.length,
+        first_load: data?.[0],
+        has_tracking: data?.[0]?.tracking_points?.length > 0,
+        tracking_count: data?.[0]?.tracking_points?.length
+      })
+      return data
+    },
+    refetchInterval: 30000,
+    staleTime: 0,
+    cacheTime: 0,
+    gcTime: 0 // React Query v5 uses gcTime instead of cacheTime
   })
 
-  const { data: escalations } = useQuery({
+  const { data: escalations, isFetching: isEscalationsFetching } = useQuery({
     queryKey: ['open-escalations'],
     queryFn: getOpenEscalations
   })
 
-  const { data: agents } = useQuery({
+  const { data: agents, isFetching: isAgentsFetching } = useQuery({
     queryKey: ['agents'],
     queryFn: getAgents
   })
 
-  const { data: emails } = useQuery({
+  const { data: emails, isFetching: isEmailsFetching } = useQuery({
     queryKey: ['sent-emails'],
     queryFn: getSentEmails
   })
@@ -2049,10 +2788,13 @@ function Dashboard({ user, onLogout }) {
 
               <button
                 onClick={() => queryClient.invalidateQueries()}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition"
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoadsFetching || isStatsFetching || isSitesFetching || isEscalationsFetching}
               >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
+                <RefreshCw className={`h-4 w-4 transition-transform ${
+                  (isLoadsFetching || isStatsFetching || isSitesFetching || isEscalationsFetching) ? 'animate-spin' : ''
+                }`} />
+                {(isLoadsFetching || isStatsFetching || isSitesFetching || isEscalationsFetching) ? 'Refreshing...' : 'Refresh'}
               </button>
 
               <div className="flex items-center gap-3 pl-4 border-l">
@@ -2075,6 +2817,34 @@ function Dashboard({ user, onLogout }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Error Banner */}
+        {(statsError || loadsError || sitesError) && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Unable to load some data</p>
+                <p className="text-xs text-red-600 mt-1">
+                  {statsError && "Dashboard stats unavailable. "}
+                  {loadsError && "Load data unavailable. "}
+                  {sitesError && "Site data unavailable. "}
+                  Please check your connection and try refreshing.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {(isStatsLoading || isLoadsLoading || isSitesLoading) && (
+          <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+              <p className="text-sm text-blue-800">Loading dashboard data...</p>
+            </div>
+          </div>
+        )}
+
         {/* Escalation Banner */}
         <EscalationBanner
           escalations={escalations}
@@ -2181,6 +2951,7 @@ function Dashboard({ user, onLogout }) {
                 loads={loads}
                 statusFilter={loadStatusFilter}
                 onFilterChange={setLoadStatusFilter}
+                onLoadClick={setSelectedLoad}
               />
             </div>
             <div className="space-y-6">
@@ -2306,6 +3077,7 @@ function Dashboard({ user, onLogout }) {
               loads={loads}
               statusFilter={loadStatusFilter}
               onFilterChange={setLoadStatusFilter}
+              onLoadClick={setSelectedLoad}
             />
           </div>
         )}
@@ -2400,6 +3172,14 @@ function Dashboard({ user, onLogout }) {
         onClose={() => setSelectedAgentForAssignment(null)}
         onSave={(agentId, siteIds) => assignSitesToAgentMutation.mutateAsync({ agentId, siteIds })}
       />
+
+      {/* Load Details Sidebar */}
+      {selectedLoad && (
+        <LoadDetailsSidebar
+          load={selectedLoad}
+          onClose={() => setSelectedLoad(null)}
+        />
+      )}
     </div>
   )
 }

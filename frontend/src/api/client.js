@@ -1,7 +1,10 @@
 import axios from 'axios'
 
+// Use environment variable or fallback to localhost for development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
 })
 
 // Dashboard
@@ -33,6 +36,10 @@ export const getUploadHistory = (customer) =>
 // Loads
 export const getLoads = () => api.get('/loads/').then(res => res.data)
 export const getActiveLoads = () => api.get('/loads/active').then(res => res.data)
+export const addNoteToLoad = (loadId, noteText, author, noteType = 'human') =>
+  api.post(`/loads/${loadId}/notes`, null, {
+    params: { note_text: noteText, author, note_type: noteType }
+  }).then(res => res.data)
 
 // Carriers
 export const getCarriers = () => api.get('/carriers/').then(res => res.data)

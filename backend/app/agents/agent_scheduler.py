@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import AIAgent, AgentStatus
 from app.agents.coordinator_agent import run_agent_check
+from app.services.staleness_monitor import create_staleness_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,27 @@ def remove_agent_job(agent_id: int):
         logger.info(f"Removed scheduled job for agent {agent_id}")
 
 
+def run_staleness_check_job():
+    """
+    Run staleness check for all sites and loads.
+    Called by the scheduler at configured intervals.
+    """
+    db: Session = SessionLocal()
+    try:
+        logger.info("Running scheduled staleness check")
+        monitor = create_staleness_monitor(db)
+        summary = monitor.run_staleness_check()
+        logger.info(
+            f"Staleness check complete: "
+            f"{summary['stale_inventory_count']} stale inventories, "
+            f"{summary['stale_eta_count']} stale ETAs"
+        )
+    except Exception as e:
+        logger.error(f"Error in scheduled staleness check: {e}")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """Start the background scheduler."""
     global _scheduler_started
@@ -104,6 +126,16 @@ def start_scheduler():
         logger.info(f"Loaded {len(active_agents)} active agents into scheduler")
     finally:
         db.close()
+
+    # Schedule staleness monitoring (runs every 30 minutes)
+    scheduler.add_job(
+        run_staleness_check_job,
+        trigger=IntervalTrigger(minutes=30),
+        id="staleness_monitor",
+        name="Staleness Monitor",
+        replace_existing=True
+    )
+    logger.info("Scheduled staleness monitoring to run every 30 minutes")
 
 
 def stop_scheduler():

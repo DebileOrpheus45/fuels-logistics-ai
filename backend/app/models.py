@@ -177,6 +177,15 @@ class Load(Base):
     last_eta_update_at = Column(DateTime, nullable=True)
     eta_staleness_threshold_hours = Column(Integer, default=4)  # Alert if ETA unchanged
 
+    # Collaborative notes (JSON array of note objects)
+    notes = Column(JSON, default=list)  # [{"author": "Agent 1", "type": "ai", "text": "...", "timestamp": "..."}]
+
+    # GPS tracking data (JSON array of tracking points)
+    tracking_points = Column(JSON, default=list)  # [{"lat": 33.7, "lng": -84.4, "timestamp": "...", "speed": 65}]
+    origin_address = Column(String(500), nullable=True)
+    destination_address = Column(String(500), nullable=True)
+    shipped_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

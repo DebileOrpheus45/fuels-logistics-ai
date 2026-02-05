@@ -1,6 +1,8 @@
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
+import json
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
@@ -43,7 +45,7 @@ def get_loads(
     return query.order_by(Load.created_at.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/active", response_model=List[LoadWithDetails])
+@router.get("/active")
 def get_active_loads(db: Session = Depends(get_db)):
     """Get all active (scheduled or in transit) loads with details."""
     loads = db.query(Load).options(
@@ -53,7 +55,65 @@ def get_active_loads(db: Session = Depends(get_db)):
         Load.status.in_([LoadStatus.SCHEDULED, LoadStatus.IN_TRANSIT])
     ).order_by(Load.current_eta.asc().nullslast()).all()
 
-    return loads
+    # Manually construct the response to ensure tracking_points is included
+    result = []
+    for load in loads:
+        load_dict = {
+            "id": load.id,
+            "po_number": load.po_number,
+            "tms_load_number": load.tms_load_number,
+            "lane_id": load.lane_id,
+            "carrier_id": load.carrier_id,
+            "destination_site_id": load.destination_site_id,
+            "origin_terminal": load.origin_terminal,
+            "product_type": load.product_type,
+            "volume": load.volume,
+            "status": load.status.value if load.status else None,
+            "has_macropoint_tracking": load.has_macropoint_tracking,
+            "driver_name": load.driver_name,
+            "driver_phone": load.driver_phone,
+            "current_eta": load.current_eta.isoformat() if load.current_eta else None,
+            "last_eta_update": load.last_eta_update.isoformat() if load.last_eta_update else None,
+            "last_email_sent": load.last_email_sent.isoformat() if load.last_email_sent else None,
+            "notes": load.notes or [],
+            "tracking_points": load.tracking_points or [],
+            "origin_address": load.origin_address,
+            "destination_address": load.destination_address,
+            "shipped_at": load.shipped_at.isoformat() if load.shipped_at else None,
+            "created_at": load.created_at.isoformat() if load.created_at else None,
+            "updated_at": load.updated_at.isoformat() if load.updated_at else None,
+            "carrier": {
+                "id": load.carrier.id,
+                "carrier_name": load.carrier.carrier_name,
+                "dispatcher_email": load.carrier.dispatcher_email,
+                "dispatcher_phone": load.carrier.dispatcher_phone,
+                "response_time_sla_hours": load.carrier.response_time_sla_hours,
+                "created_at": load.carrier.created_at.isoformat() if load.carrier.created_at else None,
+                "updated_at": load.carrier.updated_at.isoformat() if load.carrier.updated_at else None,
+            } if load.carrier else None,
+            "destination_site": {
+                "id": load.destination_site.id,
+                "consignee_code": load.destination_site.consignee_code,
+                "consignee_name": load.destination_site.consignee_name,
+                "address": load.destination_site.address,
+                "tank_capacity": load.destination_site.tank_capacity,
+                "current_inventory": load.destination_site.current_inventory,
+                "consumption_rate": load.destination_site.consumption_rate,
+                "hours_to_runout": load.destination_site.hours_to_runout,
+                "runout_threshold_hours": load.destination_site.runout_threshold_hours,
+                "min_delivery_quantity": load.destination_site.min_delivery_quantity,
+                "notes": load.destination_site.notes,
+                "customer": load.destination_site.customer,
+                "erp_source": load.destination_site.erp_source,
+                "service_type": load.destination_site.service_type,
+                "assigned_agent_id": load.destination_site.assigned_agent_id,
+                "created_at": load.destination_site.created_at.isoformat() if load.destination_site.created_at else None,
+                "updated_at": load.destination_site.updated_at.isoformat() if load.destination_site.updated_at else None,
+            } if load.destination_site else None,
+        }
+        result.append(load_dict)
+
+    return JSONResponse(content=result)
 
 
 @router.get("/needs-eta-update", response_model=List[LoadWithDetails])
@@ -181,6 +241,37 @@ def mark_email_sent(load_id: int, db: Session = Depends(get_db)):
 
     db_load.last_email_sent = datetime.utcnow()
 
+    db.commit()
+    db.refresh(db_load)
+    return db_load
+
+
+@router.post("/{load_id}/notes", response_model=LoadResponse)
+def add_note_to_load(
+    load_id: int,
+    note_text: str,
+    author: str,
+    note_type: str = "human",  # "human" or "ai"
+    db: Session = Depends(get_db)
+):
+    """Add a collaborative note to a load."""
+    db_load = db.query(Load).filter(Load.id == load_id).first()
+    if not db_load:
+        raise HTTPException(status_code=404, detail="Load not found")
+
+    # Get existing notes or initialize empty list
+    notes = db_load.notes if db_load.notes else []
+
+    # Add new note
+    new_note = {
+        "author": author,
+        "type": note_type,
+        "text": note_text,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    notes.append(new_note)
+
+    db_load.notes = notes
     db.commit()
     db.refresh(db_load)
     return db_load

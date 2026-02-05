@@ -9,6 +9,7 @@ An intelligent platform that automates fuel delivery logistics coordination usin
 - Python 3.10+
 - Node.js 18+
 - Anthropic API Key
+- Gmail account with App Password (optional - for email features)
 
 ### Installation
 
@@ -22,70 +23,67 @@ pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env and add:
+#   - ANTHROPIC_API_KEY (required)
+#   - Gmail credentials (optional - see GMAIL-SETUP.md)
 
-# 4. Seed database
+# 4. Seed database with realistic demo data
 python seed_data.py
 
-# 5. Start backend (in a new terminal)
+# 5. Add mock GPS tracking data
+python add_tracking_data.py
+
+# 6. Start backend (in a new terminal)
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# 6. Choose and start a frontend (in another terminal)
-# Option A: Base_v1 (modern design)
+# 7. Install and start frontend (in another terminal)
 cd ../frontend
 npm install
 npm run dev
 # Access: http://localhost:5173
-
-# Option B: MGClone_v1 (MercuryGate TMS style)
-cd ../MGClone_v1
-npm install
-npm run dev
-# Access: http://localhost:5174
 ```
 
 **Login:** coordinator / fuel2024
 
----
+### Optional: Email Integration
 
-## Two Frontends Available
+To enable automated ETA email polling from carriers:
 
-This project includes **two hotswappable frontends** that connect to the same backend:
-
-### Base_v1 (`frontend/` - Port 5173)
-- Modern, card-based SaaS interface
-- Mobile-friendly responsive design
-- Best for daily operations
-
-### MGClone_v1 (`MGClone_v1/` - Port 5174)
-- MercuryGate TMS-inspired control tower
-- Enterprise table-based interface
-- Best for executive dashboards and users familiar with TMS software
-
-**See [FRONTEND-SWITCHER.md](FRONTEND-SWITCHER.md) for detailed comparison and switching instructions.**
+```bash
+# See EMAIL_POLLER_SETUP.md for detailed setup
+cd backend
+python start_email_poller.py
+```
 
 ---
 
 ## Documentation
-
-- **[USER-GUIDE.md](USER-GUIDE.md)** - User-friendly guide for non-technical users
-  - How to start/stop the system
-  - Daily workflows
-  - Understanding the dashboard
-  - Common tasks and troubleshooting
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture documentation
   - System architecture diagrams
   - Database schema
   - API endpoints
   - AI agent system details
-  - Frontend architecture (both versions)
 
-- **[FRONTEND-SWITCHER.md](FRONTEND-SWITCHER.md)** - Frontend switching guide
-  - Comparison table
-  - How to run both simultaneously
-  - When to use each frontend
-  - Troubleshooting
+- **[LOAD-TRACKING.md](LOAD-TRACKING.md)** - Interactive load tracking guide
+  - GPS route visualization
+  - Load details sidebar
+  - Table sorting and search
+  - Customer tagging
+
+- **[GMAIL-SETUP.md](GMAIL-SETUP.md)** - Gmail SMTP integration guide
+  - 5-minute setup for sending emails
+  - App password generation
+  - Environment configuration
+
+- **[backend/EMAIL_POLLER_SETUP.md](backend/EMAIL_POLLER_SETUP.md)** - Gmail IMAP polling guide
+  - Automated carrier ETA reply processing
+  - Email parser capabilities
+  - Troubleshooting IMAP connection issues
+
+- **[INGESTION-ROADMAP.md](INGESTION-ROADMAP.md)** - Email automation roadmap
+  - Current email parsing features
+  - Future automation plans
 
 ---
 
@@ -93,13 +91,16 @@ This project includes **two hotswappable frontends** that connect to the same ba
 
 ### Core Capabilities
 - ✅ Real-time inventory monitoring across multiple sites
-- ✅ Automated ETA requests to carriers
+- ✅ AI-powered automated ETA requests to carriers
 - ✅ Predictive escalation of runout scenarios
 - ✅ Human-in-the-Loop (HITL) supervision dashboard
-- ✅ Batch site constraint management via CSV
+- ✅ Interactive load tracking with GPS route visualization
+- ✅ Gmail IMAP email polling for automated carrier reply processing
+- ✅ Excel-style sorting and multi-field search
+- ✅ Customer tagging and filtering
 - ✅ AI agent scheduling and automation
 - ✅ Site-specific notes and constraints
-- ✅ Multi-agent site assignment
+- ✅ Staleness detection and overnight-aware escalations
 
 ### Tech Stack
 
@@ -109,11 +110,13 @@ This project includes **two hotswappable frontends** that connect to the same ba
 - APScheduler for automated checks
 - Docker for database containerization
 
-**Frontend (Both Versions):**
+**Frontend:**
 - React 18 + Vite
-- TanStack Query (React Query)
-- TailwindCSS
+- TanStack Query (React Query) for data fetching
+- TailwindCSS for styling
 - Lucide React icons
+- Leaflet.js for interactive GPS maps
+- Environment-aware API configuration
 
 ---
 
@@ -123,28 +126,27 @@ This project includes **two hotswappable frontends** that connect to the same ba
 fuels-logistics-ai/
 ├── backend/
 │   ├── app/
-│   │   ├── agents/           # AI agent system
-│   │   ├── models.py         # SQLAlchemy models
-│   │   ├── schemas.py        # Pydantic schemas
-│   │   └── routers/          # API endpoints
-│   ├── seed_data.py          # Database seeding
+│   │   ├── agents/              # AI agent system
+│   │   ├── integrations/        # Claude API service
+│   │   ├── services/            # Email poller, OSRM routing
+│   │   ├── utils/               # Email parser, timezone helpers
+│   │   ├── models.py            # SQLAlchemy models
+│   │   ├── schemas.py           # Pydantic schemas
+│   │   └── routers/             # API endpoints
+│   ├── seed_data.py             # Realistic demo data seeding
+│   ├── start_email_poller.py    # Email poller startup script
 │   └── requirements.txt
-├── frontend/                  # Base_v1 - Modern design (port 5173)
+├── frontend/
 │   ├── src/
-│   │   ├── App.jsx
-│   │   ├── api/client.js
+│   │   ├── App.jsx              # Main dashboard component
+│   │   ├── api/client.js        # Environment-aware API client
 │   │   └── index.css
-│   └── package.json
-├── MGClone_v1/               # MercuryGate-style (port 5174)
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── api/client.js
-│   │   └── index.css
+│   ├── .env.example             # Environment variable template
 │   └── package.json
 ├── docker-compose.yml
 ├── ARCHITECTURE.md
-├── USER-GUIDE.md
-└── FRONTEND-SWITCHER.md
+├── GMAIL-SETUP.md
+└── INGESTION-ROADMAP.md
 ```
 
 ---
@@ -203,26 +205,27 @@ Proprietary - All rights reserved
 ## Support
 
 For questions or issues:
-- See [USER-GUIDE.md](USER-GUIDE.md) for usage help
 - See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
-- See [FRONTEND-SWITCHER.md](FRONTEND-SWITCHER.md) for frontend questions
+- See [LOAD-TRACKING.md](LOAD-TRACKING.md) for GPS tracking features
+- See [backend/EMAIL_POLLER_SETUP.md](backend/EMAIL_POLLER_SETUP.md) for email automation
 
 ---
 
-## Recent Updates (January 22, 2026)
+## Recent Updates (February 2026)
 
-**New Features:**
-- ✅ **Gmail SMTP Integration** - Real email sending to carriers (optional)
-- ✅ **Snapshot Ingestion API** - Hourly state updates separate from configuration
-- ✅ **Staleness Detection** - Tracks when data stops updating
-- ✅ **Overnight Awareness** - Time-based escalation urgency
-- ✅ **Decision Logging** - Lightweight token-efficient action tracking
-- ✅ **Redesigned UI** - Tabs on top, sidebar metrics, better UX
-- ✅ **Loads Tab** - Dedicated view with delayed loads filtering
+**Latest Improvements:**
+- ✅ **Gmail IMAP Email Poller** - Automated carrier ETA reply processing ($0 free solution)
+- ✅ **Environment-Aware Frontend** - Dynamic API URL configuration for production deployment
+- ✅ **Realistic Demo Data** - Professional company names and real US addresses
+- ✅ **Error Handling & Loading States** - Improved UX with retry logic and status banners
+- ✅ **Claude Sonnet 4.5 Integration** - Updated to latest 2026 model
+- ✅ **Interactive Load Tracking** - GPS route visualization with Leaflet.js
+- ✅ **Staleness Detection** - Automated monitoring of data freshness
+- ✅ **Overnight-Aware Escalations** - Time-based urgency logic
 
-See [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) for complete feature list and plans.
+See [INGESTION-ROADMAP.md](INGESTION-ROADMAP.md) for email automation roadmap.
 
 ---
 
-**Version:** 0.2.0 (MVP+)
-**Last Updated:** January 22, 2026
+**Version:** 0.4.0 (Pre-Demo)
+**Last Updated:** February 5, 2026

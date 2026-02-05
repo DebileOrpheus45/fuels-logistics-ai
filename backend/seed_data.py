@@ -29,24 +29,24 @@ def seed_database():
 
         print("Seeding database with test data...")
 
-        # Create carriers
+        # Create carriers - realistic fuel logistics companies
         carriers = [
             Carrier(
-                carrier_name="FastFuel Transport",
-                dispatcher_email="dispatch@fastfuel.com",
-                dispatcher_phone="555-0101",
+                carrier_name="Summit Petroleum Logistics",
+                dispatcher_email="dispatch@summitpetro.com",
+                dispatcher_phone="(713) 555-0101",
                 response_time_sla_hours=4
             ),
             Carrier(
-                carrier_name="PetroHaul Inc",
-                dispatcher_email="dispatch@petrohaul.com",
-                dispatcher_phone="555-0102",
+                carrier_name="Nationwide Fuel Transport",
+                dispatcher_email="dispatch@nfttransport.com",
+                dispatcher_phone="(817) 555-0245",
                 response_time_sla_hours=4
             ),
             Carrier(
-                carrier_name="Energy Express",
-                dispatcher_email="dispatch@energyexpress.com",
-                dispatcher_phone="555-0103",
+                carrier_name="American Energy Carriers",
+                dispatcher_email="dispatch@americanenergy.com",
+                dispatcher_phone="(404) 555-0389",
                 response_time_sla_hours=6
             ),
         ]
@@ -74,13 +74,13 @@ def seed_database():
         db.commit()
         print("Created AI agent")
 
-        # Create sites
+        # Create sites - realistic gas station locations
         sites_data = [
-            ("SITE001", "Downtown Gas Station", "123 Main St, City, ST 12345", 10000, 6500, 36),
-            ("SITE002", "Highway Stop #42", "456 Highway Rd, Town, ST 12346", 15000, 12000, 72),
-            ("SITE003", "Suburban Fuel Center", "789 Oak Ave, Suburb, ST 12347", 8000, 2000, 18),
-            ("SITE004", "Airport Fuel Depot", "101 Airport Blvd, City, ST 12348", 50000, 35000, 96),
-            ("SITE005", "Industrial Park Station", "202 Factory Ln, Industrial, ST 12349", 12000, 8500, 48),
+            ("ATL-001", "Peachtree Fuel & Convenience", "1245 Peachtree St NE, Atlanta, GA 30309", 10000, 6500, 36),
+            ("DFW-042", "Highway 287 Travel Center", "8920 Highway 287, Fort Worth, TX 76179", 15000, 12000, 72),
+            ("HOU-003", "Bay Area Fuel Stop", "2340 Bay Area Blvd, Houston, TX 77058", 8000, 2000, 18),
+            ("LAX-004", "LAX Airport Fuel Services", "6201 W Imperial Hwy, Los Angeles, CA 90045", 50000, 35000, 96),
+            ("CHI-005", "Midway Industrial Fuel", "5450 S Cicero Ave, Chicago, IL 60638", 12000, 8500, 48),
         ]
 
         sites = []
@@ -114,31 +114,31 @@ def seed_database():
         db.commit()
         print(f"Created {len(lanes)} lanes")
 
-        # Create some loads
+        # Create some loads - varied statuses and realistic details
         loads_data = [
-            ("PO-2024-001", sites[0], carriers[0], LoadStatus.IN_TRANSIT, 8500, "gas", 6),
-            ("PO-2024-002", sites[1], carriers[1], LoadStatus.SCHEDULED, 9000, "diesel", 24),
-            ("PO-2024-003", sites[2], carriers[0], LoadStatus.IN_TRANSIT, 7500, "gas", 3),
-            ("PO-2024-004", sites[3], carriers[2], LoadStatus.SCHEDULED, 25000, "diesel", 48),
-            ("PO-2024-005", sites[4], carriers[1], LoadStatus.DELAYED, 10000, "gas", None),
+            ("PO-2024-001", sites[0], carriers[0], LoadStatus.IN_TRANSIT, 8500, "gas", 6, "Mike Rodriguez", "(832) 555-7821"),
+            ("PO-2024-002", sites[1], carriers[1], LoadStatus.SCHEDULED, 9000, "diesel", 24, None, None),
+            ("PO-2024-003", sites[2], carriers[0], LoadStatus.IN_TRANSIT, 7500, "gas", 3, "Sarah Chen", "(713) 555-3492"),
+            ("PO-2024-004", sites[3], carriers[2], LoadStatus.SCHEDULED, 25000, "diesel", 48, None, None),
+            ("PO-2024-005", sites[4], carriers[1], LoadStatus.DELAYED, 10000, "gas", None, "James Parker", "(214) 555-9103"),
         ]
 
-        for po, site, carrier, status, volume, product, eta_hours in loads_data:
+        for po, site, carrier, status, volume, product, eta_hours, driver, phone in loads_data:
             eta = datetime.utcnow() + timedelta(hours=eta_hours) if eta_hours else None
             load = Load(
                 po_number=po,
                 tms_load_number=f"TMS-{po}",
                 carrier_id=carrier.id,
                 destination_site_id=site.id,
-                origin_terminal="Houston Terminal",
+                origin_terminal="Houston Port Terminal",
                 product_type=product,
                 volume=volume,
                 status=status,
                 current_eta=eta,
                 last_eta_update=datetime.utcnow() if eta else None,
                 has_macropoint_tracking=(status == LoadStatus.IN_TRANSIT),
-                driver_name="John Doe" if status == LoadStatus.IN_TRANSIT else None,
-                driver_phone="555-1234" if status == LoadStatus.IN_TRANSIT else None,
+                driver_name=driver,
+                driver_phone=phone,
             )
             db.add(load)
         db.commit()

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.database import engine, Base
 from app.config import get_settings
-from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots
+from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound
 from app.schemas import DashboardStats
 
 settings = get_settings()
@@ -28,14 +28,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Fuels Logistics AI Coordinator",
     description="AI-powered platform for managing fuel logistics operations",
-    version="0.1.0",
+    version="0.3.0",  # Updated to reflect GPS tracking features
     lifespan=lifespan
 )
 
-# Configure CORS for frontend
+# Configure CORS for frontend - allow all localhost ports for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"],  # React dev servers
+    allow_origin_regex=r"http://localhost:\d+",  # Allow any localhost port
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +49,8 @@ app.include_router(agents.router)
 app.include_router(escalations.router)
 app.include_router(emails.router)
 app.include_router(snapshots.router)
+app.include_router(staleness.router)
+app.include_router(email_inbound.router)
 
 
 @app.get("/")
