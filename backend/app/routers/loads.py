@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 from app.database import get_db
-from app.models import Load, LoadStatus, Site, Carrier
+from app.models import Load, LoadStatus, Site, Carrier, User
 from app.schemas import (
+from app.auth import get_current_user
     LoadCreate, LoadUpdate, LoadResponse, LoadWithDetails
 )
 
@@ -46,7 +47,8 @@ def get_loads(
 
 
 @router.get("/active")
-def get_active_loads(db: Session = Depends(get_db)):
+def get_active_loads(db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get all active (scheduled or in transit) loads with details."""
     loads = db.query(Load).options(
         joinedload(Load.carrier),
@@ -143,7 +145,8 @@ def get_loads_needing_eta_update(
 
 
 @router.get("/{load_id}", response_model=LoadWithDetails)
-def get_load(load_id: int, db: Session = Depends(get_db)):
+def get_load(load_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get a specific load with carrier and site details."""
     load = db.query(Load).options(
         joinedload(Load.carrier),
@@ -156,7 +159,8 @@ def get_load(load_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/by-po/{po_number}", response_model=LoadWithDetails)
-def get_load_by_po(po_number: str, db: Session = Depends(get_db)):
+def get_load_by_po(po_number: str, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get a load by its PO number."""
     load = db.query(Load).options(
         joinedload(Load.carrier),
@@ -169,7 +173,8 @@ def get_load_by_po(po_number: str, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=LoadResponse, status_code=201)
-def create_load(load: LoadCreate, db: Session = Depends(get_db)):
+def create_load(load: LoadCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Create a new load."""
     # Verify carrier and site exist
     carrier = db.query(Carrier).filter(Carrier.id == load.carrier_id).first()
@@ -193,7 +198,8 @@ def create_load(load: LoadCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{load_id}", response_model=LoadResponse)
-def update_load(load_id: int, load: LoadUpdate, db: Session = Depends(get_db)):
+def update_load(load_id: int, load: LoadUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Update a load's information."""
     db_load = db.query(Load).filter(Load.id == load_id).first()
     if not db_load:
@@ -233,7 +239,8 @@ def update_load_eta(
 
 
 @router.post("/{load_id}/mark-email-sent", response_model=LoadResponse)
-def mark_email_sent(load_id: int, db: Session = Depends(get_db)):
+def mark_email_sent(load_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Mark that an ETA request email was sent for this load."""
     db_load = db.query(Load).filter(Load.id == load_id).first()
     if not db_load:
@@ -278,7 +285,8 @@ def add_note_to_load(
 
 
 @router.delete("/{load_id}", status_code=204)
-def delete_load(load_id: int, db: Session = Depends(get_db)):
+def delete_load(load_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Delete a load."""
     db_load = db.query(Load).filter(Load.id == load_id).first()
     if not db_load:

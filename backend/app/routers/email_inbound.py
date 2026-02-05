@@ -9,8 +9,9 @@ from datetime import datetime
 from typing import Optional
 
 from app.database import get_db
-from app.models import Load, Activity, ActivityType
+from app.models import Load, Activity, ActivityType, User
 from app.utils.email_parser import parse_eta_from_email, extract_po_number
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/email", tags=["email"])
 

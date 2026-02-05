@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Escalation, EscalationStatus, EscalationPriority, IssueType
+from app.models import Escalation, EscalationStatus, EscalationPriority, IssueType, User
 from app.schemas import (
+from app.auth import get_current_user
     EscalationCreate, EscalationUpdate, EscalationResponse, EscalationWithDetails
 )
 
@@ -40,7 +41,8 @@ def get_escalations(
 
 
 @router.get("/open", response_model=List[EscalationWithDetails])
-def get_open_escalations(db: Session = Depends(get_db)):
+def get_open_escalations(db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get all open (unresolved) escalations with full details."""
     escalations = db.query(Escalation).options(
         joinedload(Escalation.load),
@@ -56,7 +58,8 @@ def get_open_escalations(db: Session = Depends(get_db)):
 
 
 @router.get("/stats")
-def get_escalation_stats(db: Session = Depends(get_db)):
+def get_escalation_stats(db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get escalation statistics."""
     open_count = db.query(Escalation).filter(
         Escalation.status == EscalationStatus.OPEN
@@ -86,7 +89,8 @@ def get_escalation_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/{escalation_id}", response_model=EscalationWithDetails)
-def get_escalation(escalation_id: int, db: Session = Depends(get_db)):
+def get_escalation(escalation_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get a specific escalation with full details."""
     escalation = db.query(Escalation).options(
         joinedload(Escalation.load),
@@ -99,7 +103,8 @@ def get_escalation(escalation_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=EscalationResponse, status_code=201)
-def create_escalation(escalation: EscalationCreate, db: Session = Depends(get_db)):
+def create_escalation(escalation: EscalationCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Create a new escalation."""
     db_escalation = Escalation(**escalation.model_dump())
     db.add(db_escalation)
@@ -174,7 +179,8 @@ def resolve_escalation(
 
 
 @router.delete("/{escalation_id}", status_code=204)
-def delete_escalation(escalation_id: int, db: Session = Depends(get_db)):
+def delete_escalation(escalation_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Delete an escalation."""
     db_escalation = db.query(Escalation).filter(Escalation.id == escalation_id).first()
     if not db_escalation:

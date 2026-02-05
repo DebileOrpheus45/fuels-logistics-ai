@@ -4,12 +4,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.database import get_db
-from app.models import Site, Load, LoadStatus, UploadAuditLog, Customer, ERPSource, ServiceType
+from app.models import Site, Load, LoadStatus, UploadAuditLog, Customer, ERPSource, ServiceType, User
 from app.schemas import (
     SiteCreate, SiteUpdate, SiteResponse, SiteWithLoads,
     SiteInventoryStatus, SiteBatchUpdate, BatchUploadResponse,
     UploadAuditLogResponse, ERPTemplateInfo
 )
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/sites", tags=["sites"])
 
@@ -21,7 +22,8 @@ def get_sites(
     at_risk_only: bool = False,
     customer: Optional[str] = None,
     service_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get all sites, optionally filtered by risk status, customer, or service type."""
     query = db.query(Site)
@@ -44,7 +46,10 @@ def get_sites(
 
 
 @router.get("/inventory-status", response_model=List[SiteInventoryStatus])
-def get_inventory_status(db: Session = Depends(get_db)):
+def get_inventory_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Get inventory status summary for all sites."""
     sites = db.query(Site).all()
     result = []
@@ -205,7 +210,8 @@ def get_site(site_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=SiteResponse, status_code=201)
-def create_site(site: SiteCreate, db: Session = Depends(get_db)):
+def create_site(site: SiteCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Create a new site."""
     existing = db.query(Site).filter(Site.consignee_code == site.consignee_code).first()
     if existing:

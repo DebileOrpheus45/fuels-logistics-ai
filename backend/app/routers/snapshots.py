@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.database import get_db
-from app.models import Site, Load
+from app.models import Site, Load, User
 from app.schemas import SnapshotIngestion, SnapshotIngestionResponse
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 

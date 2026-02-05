@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import AIAgent, AgentStatus, Site, Activity, ActivityType
+from app.models import AIAgent, AgentStatus, Site, Activity, ActivityType, User
 from app.schemas import (
+from app.auth import get_current_user
     AIAgentCreate, AIAgentUpdate, AIAgentResponse, AIAgentWithSites,
     ActivityCreate, ActivityResponse, AIAgentSiteAssignment
 )
@@ -30,7 +31,8 @@ def get_agents(
 
 
 @router.get("/{agent_id}", response_model=AIAgentWithSites)
-def get_agent(agent_id: int, db: Session = Depends(get_db)):
+def get_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get a specific agent with its assigned sites."""
     agent = db.query(AIAgent).options(
         joinedload(AIAgent.assigned_sites)
@@ -42,7 +44,8 @@ def get_agent(agent_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=AIAgentResponse, status_code=201)
-def create_agent(agent: AIAgentCreate, db: Session = Depends(get_db)):
+def create_agent(agent: AIAgentCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Create a new AI agent."""
     db_agent = AIAgent(**agent.model_dump())
     db.add(db_agent)
@@ -52,7 +55,8 @@ def create_agent(agent: AIAgentCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{agent_id}", response_model=AIAgentResponse)
-def update_agent(agent_id: int, agent: AIAgentUpdate, db: Session = Depends(get_db)):
+def update_agent(agent_id: int, agent: AIAgentUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Update an agent's configuration."""
     db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not db_agent:
@@ -68,7 +72,8 @@ def update_agent(agent_id: int, agent: AIAgentUpdate, db: Session = Depends(get_
 
 
 @router.post("/{agent_id}/start", response_model=AIAgentResponse)
-def start_agent(agent_id: int, db: Session = Depends(get_db)):
+def start_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Start an AI agent."""
     db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not db_agent:
@@ -81,7 +86,8 @@ def start_agent(agent_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{agent_id}/pause", response_model=AIAgentResponse)
-def pause_agent(agent_id: int, db: Session = Depends(get_db)):
+def pause_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Pause an AI agent."""
     db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not db_agent:
@@ -94,7 +100,8 @@ def pause_agent(agent_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{agent_id}/stop", response_model=AIAgentResponse)
-def stop_agent(agent_id: int, db: Session = Depends(get_db)):
+def stop_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Stop an AI agent."""
     db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not db_agent:
@@ -188,7 +195,8 @@ def bulk_assign_sites_to_agent(
 
 
 @router.delete("/{agent_id}", status_code=204)
-def delete_agent(agent_id: int, db: Session = Depends(get_db)):
+def delete_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Delete an AI agent."""
     db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not db_agent:
@@ -250,7 +258,8 @@ def log_activity(
 
 
 @router.post("/{agent_id}/run-check")
-def run_agent_check_cycle(agent_id: int, db: Session = Depends(get_db)):
+def run_agent_check_cycle(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """
     Manually trigger one check cycle for an agent.
     The agent will analyze its assigned sites and take appropriate actions.
@@ -281,7 +290,8 @@ def run_agent_check_cycle(agent_id: int, db: Session = Depends(get_db)):
 # ============== Scheduler Endpoints ==============
 
 @router.post("/{agent_id}/schedule")
-def schedule_agent(agent_id: int, db: Session = Depends(get_db)):
+def schedule_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """
     Add an agent to the automated scheduler.
     The agent will run checks at its configured interval.
@@ -306,7 +316,8 @@ def schedule_agent(agent_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{agent_id}/unschedule")
-def unschedule_agent(agent_id: int, db: Session = Depends(get_db)):
+def unschedule_agent(agent_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """
     Remove an agent from the automated scheduler.
     """

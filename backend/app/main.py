@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -6,6 +6,8 @@ from app.database import engine, Base
 from app.config import get_settings
 from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound, auth
 from app.schemas import DashboardStats
+from app.auth import get_current_user
+from app.models import User
 
 settings = get_settings()
 
@@ -72,7 +74,7 @@ def health_check():
 
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
-def get_dashboard_stats():
+def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     """Get high-level dashboard statistics."""
     from sqlalchemy.orm import Session
     from app.database import SessionLocal

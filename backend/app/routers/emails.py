@@ -5,6 +5,7 @@ Email endpoints for viewing sent emails (mock implementation).
 from fastapi import APIRouter, Query
 
 from app.integrations.email_service import email_service
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 

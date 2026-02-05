@@ -3,8 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Carrier
+from app.models import Carrier, User
 from app.schemas import CarrierCreate, CarrierUpdate, CarrierResponse
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/carriers", tags=["carriers"])
 
@@ -20,7 +21,8 @@ def get_carriers(
 
 
 @router.get("/{carrier_id}", response_model=CarrierResponse)
-def get_carrier(carrier_id: int, db: Session = Depends(get_db)):
+def get_carrier(carrier_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Get a specific carrier."""
     carrier = db.query(Carrier).filter(Carrier.id == carrier_id).first()
     if not carrier:
@@ -29,7 +31,8 @@ def get_carrier(carrier_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=CarrierResponse, status_code=201)
-def create_carrier(carrier: CarrierCreate, db: Session = Depends(get_db)):
+def create_carrier(carrier: CarrierCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Create a new carrier."""
     db_carrier = Carrier(**carrier.model_dump())
     db.add(db_carrier)
@@ -59,7 +62,8 @@ def update_carrier(
 
 
 @router.delete("/{carrier_id}", status_code=204)
-def delete_carrier(carrier_id: int, db: Session = Depends(get_db)):
+def delete_carrier(carrier_id: int, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)):
     """Delete a carrier."""
     db_carrier = db.query(Carrier).filter(Carrier.id == carrier_id).first()
     if not db_carrier:
