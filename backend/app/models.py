@@ -139,6 +139,7 @@ class Carrier(Base):
     # Relationships
     lanes = relationship("Lane", back_populates="carrier")
     loads = relationship("Load", back_populates="carrier")
+    email_logs = relationship("EmailLog", back_populates="carrier")
 
 
 class Lane(Base):
@@ -200,6 +201,7 @@ class Load(Base):
     destination_site = relationship("Site", back_populates="loads")
     activities = relationship("Activity", back_populates="load")
     escalations = relationship("Escalation", back_populates="load")
+    email_logs = relationship("EmailLog", back_populates="load")
 
     @property
     def is_eta_stale(self):
@@ -243,6 +245,7 @@ class AIAgent(Base):
     assigned_sites = relationship("Site", back_populates="assigned_agent")
     activities = relationship("Activity", back_populates="agent")
     escalations = relationship("Escalation", back_populates="created_by_agent")
+    sent_emails = relationship("EmailLog", foreign_keys="[EmailLog.sent_by_agent_id]", back_populates="sent_by_agent")
 
 
 class Activity(Base):
@@ -318,3 +321,47 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login_at = Column(DateTime, nullable=True)
+
+
+class EmailDeliveryStatus(str, enum.Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    BOUNCED = "bounced"
+    FAILED = "failed"
+    COMPLAINED = "complained"  # Recipient marked as spam
+
+
+class EmailLog(Base):
+    __tablename__ = "email_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipient = Column(String(255), nullable=False, index=True)
+    subject = Column(String(500), nullable=False)
+    body = Column(Text, nullable=False)
+    template_id = Column(String(100), nullable=True)  # For template-based emails
+    status = Column(Enum(EmailDeliveryStatus), default=EmailDeliveryStatus.PENDING, nullable=False)
+
+    # Tracking IDs
+    message_id = Column(String(255), nullable=True, index=True)  # SendGrid message ID
+    load_id = Column(Integer, ForeignKey("loads.id"), nullable=True)  # Related load if applicable
+    carrier_id = Column(Integer, ForeignKey("carriers.id"), nullable=True)  # Related carrier
+    sent_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User who triggered email
+    sent_by_agent_id = Column(Integer, ForeignKey("ai_agents.id"), nullable=True)  # Agent who sent email
+
+    # Delivery tracking
+    sent_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    bounced_at = Column(DateTime, nullable=True)
+    bounce_reason = Column(Text, nullable=True)
+    complaint_at = Column(DateTime, nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    load = relationship("Load", back_populates="email_logs")
+    carrier = relationship("Carrier", back_populates="email_logs")
+    sent_by_user = relationship("User", foreign_keys=[sent_by_user_id])
+    sent_by_agent = relationship("AIAgent", foreign_keys=[sent_by_agent_id])

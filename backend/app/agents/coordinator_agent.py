@@ -15,7 +15,7 @@ from app.models import (
     LoadStatus, AgentStatus, ActivityType, IssueType, EscalationPriority
 )
 from app.integrations.claude_service import claude_service
-from app.integrations.email_service import email_service
+from app.services.email_service import send_eta_request
 
 logger = logging.getLogger(__name__)
 
@@ -334,14 +334,12 @@ class CoordinatorAgent:
             if not carrier or not carrier.dispatcher_email:
                 return "Cannot send email: No dispatcher email on file for carrier."
 
-            # Send email
-            result = email_service.send_eta_request(
-                to_email=carrier.dispatcher_email,
-                carrier_name=carrier.carrier_name,
-                po_number=load.po_number,
-                site_name=site.consignee_name if site else "Unknown",
-                hours_to_runout=site.hours_to_runout if site else None,
-                driver_name=load.driver_name
+            # Send email via SendGrid (or mock if not configured)
+            email_log = send_eta_request(
+                db=db,
+                load=load,
+                carrier=carrier,
+                sent_by_agent_id=self.agent_id
             )
 
             # Update load
@@ -354,12 +352,19 @@ class CoordinatorAgent:
                 {
                     "to": carrier.dispatcher_email,
                     "po_number": load.po_number,
-                    "carrier": carrier.carrier_name
+                    "carrier": carrier.carrier_name,
+                    "email_log_id": email_log.id,
+                    "status": email_log.status.value
                 },
                 load_id=load_id
             )
 
-            return f"Email sent successfully to {carrier.dispatcher_email}"
+            if email_log.status.value == "sent":
+                return f"Email sent successfully to {carrier.dispatcher_email} (Message ID: {email_log.message_id})"
+            elif email_log.status.value == "failed":
+                return f"Email failed to send to {carrier.dispatcher_email}: {email_log.bounce_reason}"
+            else:
+                return f"Email logged (SendGrid not configured) - would send to {carrier.dispatcher_email}"
 
         elif tool_name == "create_escalation":
             issue_type = IssueType(tool_input["issue_type"])
