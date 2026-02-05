@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.database import engine, Base
 from app.config import get_settings
-from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound
+from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound, auth
 from app.schemas import DashboardStats
 
 settings = get_settings()
@@ -42,6 +42,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router)  # Auth router first (no /api prefix for OAuth2 compatibility)
 app.include_router(sites.router)
 app.include_router(loads.router)
 app.include_router(carriers.router)

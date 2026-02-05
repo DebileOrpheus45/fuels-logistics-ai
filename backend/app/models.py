@@ -54,6 +54,11 @@ class ActivityType(str, enum.Enum):
     ETA_UPDATED = "eta_updated"
 
 
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"
+    OPERATOR = "operator"
+
+
 class Customer(str, enum.Enum):
     STARK_INDUSTRIES = "stark_industries"
     WAYNE_ENTERPRISES = "wayne_enterprises"
@@ -298,3 +303,18 @@ class UploadAuditLog(Base):
     records_failed = Column(Integer, default=0)
     error_details = Column(JSON, nullable=True)  # List of errors if any
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    full_name = Column(String(255), nullable=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.OPERATOR, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login_at = Column(DateTime, nullable=True)
