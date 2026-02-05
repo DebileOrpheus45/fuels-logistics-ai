@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import (
     Site, Load, Carrier, AIAgent, Activity, Escalation,
-    LoadStatus, AgentStatus, ActivityType, IssueType, EscalationPriority
+    LoadStatus, AgentStatus, ActivityType, IssueType, EscalationPriority, AgentExecutionMode
 )
 from app.integrations.claude_service import claude_service
 from app.services.email_service import send_eta_request
@@ -323,6 +323,15 @@ class CoordinatorAgent:
             })
 
         elif tool_name == "send_eta_request_email":
+            # Check execution mode
+            agent = self._get_agent()
+            if agent.execution_mode == AgentExecutionMode.DRAFT_ONLY:
+                return (
+                    f"[DRAFT MODE] Would send ETA request email for Load {tool_input['load_id']}. "
+                    "Agent is in DRAFT_ONLY mode - no emails will be sent. "
+                    "Upgrade to AUTO_EMAIL or FULL_AUTO to enable automatic email sending."
+                )
+
             load_id = tool_input["load_id"]
             load = db.query(Load).filter(Load.id == load_id).first()
             if not load:
@@ -335,6 +344,7 @@ class CoordinatorAgent:
                 return "Cannot send email: No dispatcher email on file for carrier."
 
             # Send email via SendGrid (or mock if not configured)
+            # This executes only in AUTO_EMAIL or FULL_AUTO mode
             email_log = send_eta_request(
                 db=db,
                 load=load,
@@ -367,9 +377,26 @@ class CoordinatorAgent:
                 return f"Email logged (SendGrid not configured) - would send to {carrier.dispatcher_email}"
 
         elif tool_name == "create_escalation":
+            # Check execution mode
+            agent = self._get_agent()
             issue_type = IssueType(tool_input["issue_type"])
             priority = EscalationPriority(tool_input["priority"])
 
+            if agent.execution_mode == AgentExecutionMode.DRAFT_ONLY:
+                return (
+                    f"[DRAFT MODE] Would create {priority.value} escalation: {tool_input['description']}. "
+                    "Agent is in DRAFT_ONLY mode - no escalations will be created automatically. "
+                    "Upgrade to AUTO_EMAIL or FULL_AUTO to enable automatic escalations."
+                )
+
+            if agent.execution_mode == AgentExecutionMode.AUTO_EMAIL:
+                return (
+                    f"[AUTO_EMAIL MODE] Would create {priority.value} escalation: {tool_input['description']}. "
+                    "Agent is in AUTO_EMAIL mode - escalations require manual approval. "
+                    "Upgrade to FULL_AUTO to enable automatic escalation creation."
+                )
+
+            # Only execute in FULL_AUTO mode
             escalation = Escalation(
                 created_by_agent_id=self.agent_id,
                 issue_type=issue_type,
@@ -387,7 +414,8 @@ class CoordinatorAgent:
                 {
                     "issue_type": issue_type.value,
                     "priority": priority.value,
-                    "description": tool_input["description"]
+                    "description": tool_input["description"],
+                    "escalation_id": escalation.id
                 }
             )
 

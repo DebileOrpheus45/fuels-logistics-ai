@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from app.database import SessionLocal, engine, Base
 from app.models import (
     Site, Carrier, Lane, Load, AIAgent,
-    LoadStatus, AgentStatus
+    LoadStatus, AgentStatus, AgentExecutionMode
 )
 
 
@@ -55,10 +55,11 @@ def seed_database():
         db.commit()
         print(f"Created {len(carriers)} carriers")
 
-        # Create AI Agent
+        # Create AI Agent (starts in DRAFT_ONLY mode for safety)
         agent = AIAgent(
             agent_name="Coordinator Agent 1",
             status=AgentStatus.STOPPED,
+            execution_mode=AgentExecutionMode.DRAFT_ONLY,  # Safe default - no automated actions
             check_interval_minutes=15,
             configuration={
                 "email_templates": {

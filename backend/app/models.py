@@ -22,6 +22,19 @@ class AgentStatus(str, enum.Enum):
     STOPPED = "stopped"
 
 
+class AgentExecutionMode(str, enum.Enum):
+    """
+    Agent execution modes for graduated autonomy.
+
+    DRAFT_ONLY: Agent analyzes and creates draft actions but doesn't execute (safest)
+    AUTO_EMAIL: Agent can send emails automatically but requires approval for escalations
+    FULL_AUTO: Agent can send emails and create escalations automatically (highest autonomy)
+    """
+    DRAFT_ONLY = "draft_only"
+    AUTO_EMAIL = "auto_email"
+    FULL_AUTO = "full_auto"
+
+
 class EscalationPriority(str, enum.Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -227,6 +240,7 @@ class AIAgent(Base):
     agent_name = Column(String(255), nullable=False)
     persona_type = Column(String(100), default="coordinator")  # coordinator, monitor, etc.
     status = Column(Enum(AgentStatus), default=AgentStatus.STOPPED)
+    execution_mode = Column(Enum(AgentExecutionMode), default=AgentExecutionMode.DRAFT_ONLY, nullable=False)
     last_activity_at = Column(DateTime, nullable=True)
     check_interval_minutes = Column(Integer, default=15)
     configuration = Column(JSON, default=dict)

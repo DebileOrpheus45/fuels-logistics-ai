@@ -202,6 +202,7 @@ class AIAgentUpdate(BaseModel):
     agent_name: Optional[str] = None
     persona_type: Optional[str] = None
     status: Optional[AgentStatus] = None
+    execution_mode: Optional[str] = None  # AgentExecutionMode enum value
     check_interval_minutes: Optional[int] = None
     configuration: Optional[Dict[str, Any]] = None
 
@@ -214,6 +215,7 @@ class AIAgentSiteAssignment(BaseModel):
 class AIAgentResponse(AIAgentBase):
     id: int
     status: AgentStatus
+    execution_mode: str  # AgentExecutionMode enum value
     last_activity_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
