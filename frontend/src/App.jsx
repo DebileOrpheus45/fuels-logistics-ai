@@ -23,7 +23,13 @@ import {
   getCustomers,
   getErpSources,
   getErpTemplate,
-  addNoteToLoad
+  addNoteToLoad,
+  login as apiLogin,
+  logout as apiLogout,
+  getStoredUser,
+  isAuthenticated,
+  syncToSheets,
+  getSheetsStatus
 } from './api/client'
 import {
   Fuel,
@@ -85,18 +91,28 @@ function LoginPage({ onLogin }) {
     setIsLoading(true)
     setError('')
 
-    // Simulate authentication (replace with real auth later)
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    // Demo credentials: coordinator / fuel2024
-    if (username === 'coordinator' && password === 'fuel2024') {
-      onLogin({ username, role: 'coordinator', name: 'Fuels Coordinator' })
-    } else if (username === 'admin' && password === 'admin') {
-      onLogin({ username, role: 'admin', name: 'System Admin' })
-    } else {
-      setError('Invalid username or password')
+    try {
+      // Call real API login
+      const user = await apiLogin(username, password)
+      onLogin({
+        username: user.username,
+        role: user.role,
+        name: user.full_name || user.username,
+        email: user.email,
+        id: user.id
+      })
+    } catch (err) {
+      // Handle login error
+      if (err.response?.status === 401) {
+        setError('Invalid username or password')
+      } else if (err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError('Login failed. Please try again.')
+      }
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
@@ -183,7 +199,8 @@ function LoginPage({ onLogin }) {
             <p className="text-sm text-gray-500 text-center">
               Demo credentials:
             </p>
-            <div className="mt-2 flex gap-2 justify-center">
+            <div className="mt-2 flex flex-col gap-1 items-center">
+              <code className="px-2 py-1 bg-gray-100 rounded text-xs">admin / admin123</code>
               <code className="px-2 py-1 bg-gray-100 rounded text-xs">coordinator / fuel2024</code>
             </div>
           </div>
@@ -1187,17 +1204,9 @@ function GoogleSheetsPanel({ sites, loads }) {
 
     try {
       // Call backend to sync with Google Sheets
-      const response = await fetch('/api/sheets/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          spreadsheet_url: sheetUrl,
-          sites: sites,
-          loads: loads
-        })
-      })
+      const result = await syncToSheets(sheetUrl, sites, loads)
 
-      if (response.ok) {
+      if (result.success) {
         const now = new Date().toLocaleString()
         setLastSync(now)
         localStorage.setItem('lastSync', now)
@@ -1490,8 +1499,43 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!runHistory?.length) return
+                // Convert to CSV
+                const headers = ['ID', 'Agent', 'Started At', 'Duration (s)', 'Status', 'Mode', 'Sites', 'Loads', 'Emails', 'Escalations', 'API Calls', 'Tokens']
+                const rows = runHistory.map(run => [
+                  run.id,
+                  agents?.find(a => a.id === run.agent_id)?.agent_name || run.agent_id,
+                  new Date(run.started_at).toISOString(),
+                  run.duration_seconds?.toFixed(1) || '',
+                  run.status,
+                  run.execution_mode,
+                  run.sites_checked || 0,
+                  run.loads_checked || 0,
+                  run.emails_sent || 0,
+                  run.escalations_created || 0,
+                  run.api_calls || 0,
+                  run.tokens_used || 0
+                ])
+                const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
+                const blob = new Blob([csv], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `agent-run-history-${new Date().toISOString().split('T')[0]}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              className="p-1 hover:bg-white/20 rounded"
+              title="Export to CSV"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+            <button
               onClick={(e) => { e.stopPropagation(); queryClient.invalidateQueries(['agent-run-history']) }}
               className="p-1 hover:bg-white/20 rounded"
+              title="Refresh"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
@@ -3379,18 +3423,27 @@ function Dashboard({ user, onLogout }) {
 // ============== Main App ==============
 function App() {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user')
-    return saved ? JSON.parse(saved) : null
+    // Check for stored user from real auth
+    const storedUser = getStoredUser()
+    if (storedUser && isAuthenticated()) {
+      return {
+        username: storedUser.username,
+        role: storedUser.role,
+        name: storedUser.full_name || storedUser.username,
+        email: storedUser.email,
+        id: storedUser.id
+      }
+    }
+    return null
   })
 
   const handleLogin = (userData) => {
     setUser(userData)
-    localStorage.setItem('user', JSON.stringify(userData))
   }
 
   const handleLogout = () => {
+    apiLogout()
     setUser(null)
-    localStorage.removeItem('user')
   }
 
   if (!user) {

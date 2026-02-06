@@ -2,16 +2,66 @@ import axios from 'axios'
 
 // Use environment variable or fallback to localhost for development
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const AUTH_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'
 
-// Demo admin token (long-lived for demo purposes)
-const DEMO_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTgwMTg4NDQ2OX0.IgePuwde-foLHgtCLhTenhY5dFOJ3vC4EukqLM5o9cE'
+// Token storage key
+const TOKEN_KEY = 'fuels_auth_token'
+const USER_KEY = 'fuels_auth_user'
+
+// Get stored token
+const getStoredToken = () => localStorage.getItem(TOKEN_KEY)
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Authorization': `Bearer ${DEMO_TOKEN}`
-  }
+  baseURL: API_BASE_URL
 })
+
+// Add auth header interceptor
+api.interceptors.request.use((config) => {
+  const token = getStoredToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Auth functions
+export const login = async (username, password) => {
+  const formData = new URLSearchParams()
+  formData.append('username', username)
+  formData.append('password', password)
+
+  // Auth endpoint is at /auth (no /api prefix)
+  const response = await axios.post(`${AUTH_BASE_URL}/auth/login`, formData, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  })
+
+  const { access_token } = response.data
+  localStorage.setItem(TOKEN_KEY, access_token)
+
+  // Fetch user info (auth/me is also without /api prefix)
+  const userResponse = await axios.get(`${AUTH_BASE_URL}/auth/me`, {
+    headers: { Authorization: `Bearer ${access_token}` }
+  })
+  localStorage.setItem(USER_KEY, JSON.stringify(userResponse.data))
+
+  return userResponse.data
+}
+
+export const logout = () => {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+export const getStoredUser = () => {
+  const user = localStorage.getItem(USER_KEY)
+  return user ? JSON.parse(user) : null
+}
+
+export const isAuthenticated = () => {
+  return !!getStoredToken()
+}
+
+export const getCurrentUser = () => api.get('/auth/me').then(res => res.data)
 
 // Dashboard
 export const getDashboardStats = () => api.get('/dashboard/stats').then(res => res.data)
@@ -73,5 +123,10 @@ export const resolveEscalation = (id, notes) =>
 
 // Emails
 export const getSentEmails = () => api.get('/emails/sent').then(res => res.data)
+
+// Google Sheets
+export const getSheetsStatus = () => api.get('/sheets/status').then(res => res.data)
+export const syncToSheets = (spreadsheetUrl, sites, loads) =>
+  api.post('/sheets/sync', { spreadsheet_url: spreadsheetUrl, sites, loads }).then(res => res.data)
 
 export default api
