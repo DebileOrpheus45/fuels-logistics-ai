@@ -116,40 +116,33 @@ function LoginPage({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-cyan-900 flex items-center justify-center p-4">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }} />
-      </div>
-
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur rounded-2xl mb-4">
-            <Fuel className="h-10 w-10 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-xl mb-4">
+            <Fuel className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Fuels Logistics AI</h1>
-          <p className="text-blue-200 mt-2">Coordinator Dashboard</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Fuels Logistics</h1>
+          <p className="text-slate-500 mt-1">AI Coordinator</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Sign In</h2>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
+          <h2 className="text-lg font-semibold text-slate-900 mb-6">Sign in to your account</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Username
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition"
                   placeholder="Enter username"
                   required
                 />
@@ -157,16 +150,16 @@ function LoginPage({ onLogin }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition"
                   placeholder="Enter password"
                   required
                 />
@@ -174,7 +167,7 @@ function LoginPage({ onLogin }) {
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
                 {error}
               </div>
             )}
@@ -182,11 +175,11 @@ function LoginPage({ onLogin }) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-cyan-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
-                  <RefreshCw className="h-5 w-5 animate-spin" />
+                  <RefreshCw className="h-4 w-4 animate-spin" />
                   Signing in...
                 </>
               ) : (
@@ -195,19 +188,19 @@ function LoginPage({ onLogin }) {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-500 text-center">
-              Demo credentials:
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-400 text-center mb-2">
+              Demo credentials
             </p>
-            <div className="mt-2 flex flex-col gap-1 items-center">
-              <code className="px-2 py-1 bg-gray-100 rounded text-xs">admin / admin123</code>
-              <code className="px-2 py-1 bg-gray-100 rounded text-xs">coordinator / fuel2024</code>
+            <div className="flex flex-col gap-1 items-center">
+              <code className="px-2 py-1 bg-slate-50 border border-slate-100 rounded text-xs text-slate-600">admin / admin123</code>
+              <code className="px-2 py-1 bg-slate-50 border border-slate-100 rounded text-xs text-slate-600">coordinator / fuel2024</code>
             </div>
           </div>
         </div>
 
-        <p className="text-center text-blue-200 text-sm mt-6">
-          Powered by AI Logistics Coordinator
+        <p className="text-center text-slate-400 text-xs mt-6">
+          Powered by Claude AI
         </p>
       </div>
     </div>
@@ -1246,17 +1239,17 @@ function GoogleSheetsPanel({ sites, loads }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      <div className="px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-6 w-6" />
-          <h3 className="text-lg font-bold">Google Sheets Dashboard</h3>
+          <FileSpreadsheet className="h-5 w-5 text-slate-600" />
+          <h3 className="text-base font-semibold text-slate-900">Google Sheets Dashboard</h3>
         </div>
       </div>
 
       <div className="p-4 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Spreadsheet URL
           </label>
           <input
@@ -1264,9 +1257,9 @@ function GoogleSheetsPanel({ sites, loads }) {
             value={sheetUrl}
             onChange={(e) => setSheetUrl(e.target.value)}
             placeholder="https://docs.google.com/spreadsheets/d/..."
-            className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-green-500"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Share the sheet with the service account email
           </p>
         </div>
@@ -1275,7 +1268,7 @@ function GoogleSheetsPanel({ sites, loads }) {
           <button
             onClick={handleSync}
             disabled={!sheetUrl || isSyncing}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition"
           >
             {isSyncing ? (
               <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1287,7 +1280,7 @@ function GoogleSheetsPanel({ sites, loads }) {
 
           <button
             onClick={exportToCsv}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600"
           >
             <Download className="h-4 w-4" />
             Export CSV
@@ -1295,7 +1288,7 @@ function GoogleSheetsPanel({ sites, loads }) {
         </div>
 
         {lastSync && (
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-slate-400 text-center">
             Last synced: {lastSync}
           </p>
         )}
@@ -1485,19 +1478,19 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
       </div>
 
       {/* Run History Panel */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div
-          className="px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between cursor-pointer"
+          className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between cursor-pointer"
           onClick={() => setShowRunHistory(!showRunHistory)}
         >
           <div className="flex items-center gap-2">
-            <History className="h-6 w-6" />
-            <h3 className="text-lg font-bold">Agent Run History</h3>
-            <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+            <History className="h-5 w-5 text-slate-600" />
+            <h3 className="text-base font-semibold text-slate-900">Agent Run History</h3>
+            <span className="ml-2 px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full text-xs">
               {runHistory?.length || 0} runs
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -1527,31 +1520,31 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                 a.click()
                 URL.revokeObjectURL(url)
               }}
-              className="p-1 hover:bg-white/20 rounded"
+              className="p-1.5 text-slate-500 hover:bg-slate-200 rounded"
               title="Export to CSV"
             >
               <Download className="h-4 w-4" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); queryClient.invalidateQueries(['agent-run-history']) }}
-              className="p-1 hover:bg-white/20 rounded"
+              className="p-1.5 text-slate-500 hover:bg-slate-200 rounded"
               title="Refresh"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            {showRunHistory ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            {showRunHistory ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
           </div>
         </div>
 
         {showRunHistory && (
           <div className="max-h-[400px] overflow-y-auto">
             {runHistoryLoading ? (
-              <div className="p-8 text-center text-gray-500">
-                <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin text-emerald-500" />
-                <p>Loading run history...</p>
+              <div className="p-8 text-center text-slate-400">
+                <RefreshCw className="h-6 w-6 mx-auto mb-2 animate-spin text-slate-400" />
+                <p className="text-sm">Loading run history...</p>
               </div>
             ) : !runHistory?.length ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-slate-400 text-sm">
                 <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>No agent runs recorded yet.</p>
                 <p className="text-sm mt-1">Run an agent check to see execution metrics.</p>
@@ -1830,33 +1823,33 @@ function AgentManagementPanel({ agents, sites }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      <div className="px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-        <div className="flex items-center gap-2">
-          <Bot className="h-6 w-6" />
-          <h3 className="text-lg font-bold">AI Agent Control Center</h3>
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+        <div className="flex items-center gap-2 text-slate-900">
+          <Bot className="h-5 w-5 text-slate-600" />
+          <h3 className="text-base font-semibold">AI Agent Control</h3>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-3">
         {agents?.map((agent) => {
           const agentSites = getAgentSites(agent.id)
           const isSelected = selectedAgent === agent.id
 
           return (
-            <div key={agent.id} className="border rounded-lg overflow-hidden">
+            <div key={agent.id} className="border border-slate-200 rounded-lg overflow-hidden">
               <div
-                className={`p-4 cursor-pointer transition ${isSelected ? 'bg-purple-50' : 'hover:bg-gray-50'}`}
+                className={`p-4 cursor-pointer transition ${isSelected ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
                 onClick={() => setSelectedAgent(isSelected ? null : agent.id)}
               >
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      agent.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                    <div className={`w-2.5 h-2.5 rounded-full ${
+                      agent.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'
                     }`} />
                     <div>
-                      <h4 className="font-bold">{agent.agent_name}</h4>
-                      <p className="text-xs text-gray-500">
+                      <h4 className="font-medium text-slate-900">{agent.agent_name}</h4>
+                      <p className="text-xs text-slate-500">
                         {agentSites.length} sites assigned • {agent.status}
                       </p>
                     </div>
@@ -2369,8 +2362,8 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
       return null // Don't show any icon on unsorted columns
     }
     return sortConfig.direction === 'asc'
-      ? <ArrowUp className="h-4 w-4 text-gray-700" />
-      : <ArrowDown className="h-4 w-4 text-gray-700" />
+      ? <ArrowUp className="h-4 w-4 text-slate-700" />
+      : <ArrowDown className="h-4 w-4 text-slate-700" />
   }
 
   const clearAllFilters = () => {
@@ -2494,36 +2487,36 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Truck className="h-6 w-6" />
-            <h3 className="text-lg font-bold">Active Shipments</h3>
+            <Truck className="h-5 w-5 text-slate-600" />
+            <h3 className="text-base font-semibold text-slate-900">Active Shipments</h3>
             {statusFilter !== 'all' && (
-              <span className="text-xs bg-white/20 px-2 py-1 rounded">
+              <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
                 {statusFilter === 'DELAYED' ? 'Delayed Only' : statusFilter}
               </span>
             )}
           </div>
           {onFilterChange && (
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <button
                 onClick={() => onFilterChange('all')}
-                className={`text-xs px-3 py-1 rounded ${
+                className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${
                   statusFilter === 'all'
-                    ? 'bg-white text-blue-600'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                 }`}
               >
                 All
               </button>
               <button
                 onClick={() => onFilterChange('DELAYED')}
-                className={`text-xs px-3 py-1 rounded ${
+                className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${
                   statusFilter === 'DELAYED'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                 }`}
               >
                 Delayed
@@ -2535,18 +2528,18 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
         {/* Search and Clear Filters Row */}
         <div className="flex items-center gap-3">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-300" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               placeholder="Search by PO#, carrier, destination, status..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:bg-white/20 focus:border-white/40 transition"
+              className="w-full pl-10 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-200 hover:text-white transition"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
               >
                 <XCircle className="h-4 w-4" />
               </button>
@@ -2555,21 +2548,21 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
           {(sortConfig.key || searchQuery || statusFilter !== 'all') && (
             <button
               onClick={clearAllFilters}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition text-sm font-medium"
             >
               <XCircle className="h-4 w-4" />
-              Clear Filters
+              Clear
             </button>
           )}
         </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12"></th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-slate-400 uppercase w-12"></th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('po_number')}
               >
                 <div className="flex items-center gap-2">
@@ -2578,7 +2571,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                 </div>
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('carrier')}
               >
                 <div className="flex items-center gap-2">
@@ -2587,7 +2580,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                 </div>
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('destination')}
               >
                 <div className="flex items-center gap-2">
@@ -2596,7 +2589,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                 </div>
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('volume')}
               >
                 <div className="flex items-center gap-2">
@@ -2605,7 +2598,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                 </div>
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('eta')}
               >
                 <div className="flex items-center gap-2">
@@ -2614,7 +2607,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                 </div>
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('status')}
               >
                 <div className="flex items-center gap-2">
@@ -2624,10 +2617,10 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-slate-100">
             {filteredAndSortedLoads?.length === 0 && (
               <tr>
-                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="7" className="px-5 py-8 text-center text-slate-400">
                   No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} loads found
                 </td>
               </tr>
@@ -2636,13 +2629,13 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
               <>
                 <tr
                   key={load.id}
-                  className="hover:bg-blue-50 transition-smooth cursor-pointer"
+                  className="hover:bg-slate-50 transition-colors cursor-pointer"
                   onClick={() => onLoadClick?.(load)}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-5 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setExpandedLoadId(expandedLoadId === load.id ? null : load.id)}
-                      className="text-gray-400 hover:text-blue-600 transition-smooth"
+                      className="text-slate-400 hover:text-slate-600 transition"
                     >
                       {expandedLoadId === load.id ? (
                         <ChevronUp className="h-5 w-5" />
@@ -2651,12 +2644,12 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                       )}
                     </button>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         {load.po_number}
                         {load.notes?.length > 0 && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-50 text-violet-600 rounded-full text-xs">
                             <MessageSquare className="h-3 w-3" />
                             {load.notes.length}
                           </span>
@@ -2669,34 +2662,34 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
                     {load.carrier?.carrier_name || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
                     {load.destination_site?.consignee_code || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
                     {load.volume?.toLocaleString()} gal
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
                     {load.current_eta ? new Date(load.current_eta).toLocaleString() : 'Pending'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-5 py-4 whitespace-nowrap">
                     {getStatusBadge(load.status)}
                   </td>
                 </tr>
                 {expandedLoadId === load.id && (
                   <tr key={`${load.id}-notes`}>
-                    <td colSpan="7" className="px-6 py-4 bg-gray-50 animate-fadeIn">
+                    <td colSpan="7" className="px-5 py-4 bg-slate-50 border-t border-slate-100">
                       <div className="space-y-4">
                         {/* Existing Notes */}
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                          <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                             <MessageSquare className="h-4 w-4" />
                             Collaborative Notes
                           </h4>
                           {load.notes?.length === 0 ? (
-                            <p className="text-sm text-gray-500 italic">No notes yet. Add one below!</p>
+                            <p className="text-sm text-slate-400 italic">No notes yet. Add one below!</p>
                           ) : (
                             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                               {load.notes?.map((note, idx) => (
@@ -2784,32 +2777,32 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
 // ============== Emails Panel ==============
 function EmailsPanel({ emails, onViewEmail }) {
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      <div className="px-6 py-4 border-b bg-gradient-to-r from-cyan-600 to-blue-600 text-white">
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <Mail className="h-6 w-6" />
-          <h3 className="text-lg font-bold">Sent Communications</h3>
+          <Mail className="h-5 w-5 text-slate-600" />
+          <h3 className="text-base font-semibold text-slate-900">Sent Communications</h3>
         </div>
       </div>
-      <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
+      <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
         {emails?.emails?.length === 0 && (
-          <p className="text-gray-500 text-center py-4">No emails sent yet</p>
+          <p className="text-slate-400 text-center py-4 text-sm">No emails sent yet</p>
         )}
         {emails?.emails?.map((email, idx) => (
           <div
             key={idx}
-            className="border rounded-lg p-3 hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer"
+            className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
             onClick={() => onViewEmail?.(email)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-blue-600" />
-                <span className="font-medium">{email.to}</span>
+                <Mail className="h-4 w-4 text-slate-500" />
+                <span className="font-medium text-slate-700">{email.to}</span>
               </div>
-              <Eye className="h-4 w-4 text-gray-400" />
+              <Eye className="h-4 w-4 text-slate-400" />
             </div>
-            <p className="text-sm font-medium mt-1">{email.subject}</p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
+            <p className="text-xs text-slate-400 mt-1">
               {new Date(email.sent_at).toLocaleString()}
             </p>
           </div>
@@ -2822,31 +2815,31 @@ function EmailsPanel({ emails, onViewEmail }) {
 // ============== Stats Card ==============
 function StatsCard({ title, value, icon: Icon, color = 'blue', onClick, clickable = false }) {
   const colors = {
-    blue: 'from-blue-500 to-blue-600',
-    green: 'from-green-500 to-green-600',
-    yellow: 'from-yellow-500 to-orange-500',
-    red: 'from-red-500 to-red-600',
-    purple: 'from-purple-500 to-indigo-600'
+    blue: 'bg-blue-50 text-blue-600',
+    green: 'bg-emerald-50 text-emerald-600',
+    yellow: 'bg-amber-50 text-amber-600',
+    red: 'bg-red-50 text-red-600',
+    purple: 'bg-violet-50 text-violet-600'
   }
 
   return (
     <div
-      className={`bg-white rounded-lg shadow-md p-4 transition-smooth animate-fadeIn hover-lift ${
-        clickable ? 'cursor-pointer hover:ring-2 hover:ring-blue-300' : ''
+      className={`bg-white rounded-lg border border-slate-200 p-4 transition-all ${
+        clickable ? 'cursor-pointer hover:border-slate-300 hover:shadow-sm' : ''
       }`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-0.5 transition-all duration-300">{value}</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{title}</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
         </div>
-        <div className={`p-2.5 rounded-lg bg-gradient-to-br ${colors[color]} transition-transform duration-300 hover:scale-110`}>
-          <Icon className="h-5 w-5 text-white" />
+        <div className={`p-2.5 rounded-lg ${colors[color]}`}>
+          <Icon className="h-5 w-5" />
         </div>
       </div>
       {clickable && (
-        <p className="text-xs text-blue-500 mt-1.5 flex items-center gap-1 animate-fadeIn">
+        <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
           <Filter className="h-3 w-3" /> Click to filter
         </p>
       )}
@@ -2886,21 +2879,10 @@ function Dashboard({ user, onLogout }) {
   })
 
   const { data: loads, isFetching: isLoadsFetching, error: loadsError, isLoading: isLoadsLoading } = useQuery({
-    queryKey: ['active-loads-v3-FORCE-REFRESH'], // FORCE NEW CACHE
-    queryFn: async () => {
-      const data = await getActiveLoads()
-      console.log('🚨 LOADS FETCHED FROM API:', {
-        count: data?.length,
-        first_load: data?.[0],
-        has_tracking: data?.[0]?.tracking_points?.length > 0,
-        tracking_count: data?.[0]?.tracking_points?.length
-      })
-      return data
-    },
+    queryKey: ['active-loads'],
+    queryFn: getActiveLoads,
     refetchInterval: 30000,
-    staleTime: 0,
-    cacheTime: 0,
-    gcTime: 0 // React Query v5 uses gcTime instead of cacheTime
+    staleTime: 10000
   })
 
   const { data: escalations, isFetching: isEscalationsFetching } = useQuery({
@@ -2992,31 +2974,29 @@ function Dashboard({ user, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl">
-                  <Fuel className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">Fuels Logistics AI</h1>
-                  <p className="text-xs text-gray-500">Coordinator Dashboard</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-slate-900 rounded-lg">
+                <Fuel className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-slate-900">Fuels Logistics</h1>
+                <p className="text-xs text-slate-500">AI Coordinator</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {escalations?.length > 0 && (
                 <button
                   onClick={() => setActiveTab('escalations')}
-                  className="relative p-2 text-gray-500 hover:text-gray-700"
+                  className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
                 >
-                  <Bell className="h-6 w-6" />
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                  <Bell className="h-5 w-5" />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
                     {escalations.length}
                   </span>
                 </button>
@@ -3024,26 +3004,25 @@ function Dashboard({ user, onLogout }) {
 
               <button
                 onClick={() => queryClient.invalidateQueries()}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg text-sm transition"
                 disabled={isLoadsFetching || isStatsFetching || isSitesFetching || isEscalationsFetching}
               >
-                <RefreshCw className={`h-4 w-4 transition-transform ${
+                <RefreshCw className={`h-4 w-4 ${
                   (isLoadsFetching || isStatsFetching || isSitesFetching || isEscalationsFetching) ? 'animate-spin' : ''
                 }`} />
-                {(isLoadsFetching || isStatsFetching || isSitesFetching || isEscalationsFetching) ? 'Refreshing...' : 'Refresh'}
               </button>
 
-              <div className="flex items-center gap-3 pl-4 border-l">
+              <div className="flex items-center gap-3 pl-3 ml-3 border-l border-slate-200">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                  <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                  <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                  <p className="text-xs text-slate-500 capitalize">{user.role}</p>
                 </div>
                 <button
                   onClick={onLogout}
-                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                   title="Sign Out"
                 >
-                  <LogOut className="h-5 w-5" />
+                  <LogOut className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -3052,20 +3031,15 @@ function Dashboard({ user, onLogout }) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-6 py-6">
         {/* Error Banner */}
         {(statsError || loadsError || sitesError) && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-lg">
             <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-red-800">Unable to load some data</p>
-                <p className="text-xs text-red-600 mt-1">
-                  {statsError && "Dashboard stats unavailable. "}
-                  {loadsError && "Load data unavailable. "}
-                  {sitesError && "Site data unavailable. "}
-                  Please check your connection and try refreshing.
-                </p>
+                <p className="text-sm font-medium text-red-700">Unable to load data</p>
+                <p className="text-xs text-red-600 mt-0.5">Check your connection and try refreshing.</p>
               </div>
             </div>
           </div>
@@ -3073,10 +3047,10 @@ function Dashboard({ user, onLogout }) {
 
         {/* Loading State */}
         {(isStatsLoading || isLoadsLoading || isSitesLoading) && (
-          <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+          <div className="mb-6 bg-slate-100 border border-slate-200 p-4 rounded-lg">
             <div className="flex items-center gap-3">
-              <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-              <p className="text-sm text-blue-800">Loading dashboard data...</p>
+              <RefreshCw className="h-4 w-4 text-slate-500 animate-spin" />
+              <p className="text-sm text-slate-600">Loading...</p>
             </div>
           </div>
         )}
@@ -3087,8 +3061,8 @@ function Dashboard({ user, onLogout }) {
           onViewAll={() => setActiveTab('escalations')}
         />
 
-        {/* Tab Navigation - Moved to top with better styling */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 border-b-2 border-gray-200">
+        {/* Tab Navigation */}
+        <div className="flex gap-1 mb-6 border-b border-slate-200">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: Activity },
             { id: 'sites', label: 'Sites', icon: Fuel },
@@ -3103,14 +3077,17 @@ function Dashboard({ user, onLogout }) {
                 setActiveTab(id)
                 if (id !== 'sites') setSiteFilter('all')
               }}
-              className={`flex items-center gap-2 px-4 py-3 rounded-t-lg font-medium whitespace-nowrap transition border-b-4 ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors relative ${
                 activeTab === id
-                  ? 'bg-white text-blue-600 border-blue-600 shadow-sm'
-                  : 'bg-transparent text-gray-600 hover:text-blue-600 hover:bg-gray-50 border-transparent'
+                  ? 'text-slate-900'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               <TabIcon className="h-4 w-4" />
               {label}
+              {activeTab === id && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900" />
+              )}
             </button>
           ))}
         </div>
@@ -3121,7 +3098,7 @@ function Dashboard({ user, onLogout }) {
           <div className="w-64 flex-shrink-0 space-y-4">
             {/* CRITICAL METRICS */}
             <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">Critical</h3>
+              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider px-1">Critical</h3>
               <StatsCard
                 title="Sites at Risk"
                 value={stats?.sites_at_risk || 0}
@@ -3152,8 +3129,8 @@ function Dashboard({ user, onLogout }) {
             </div>
 
             {/* OPERATIONAL METRICS */}
-            <div className="space-y-3 pt-4 border-t border-gray-200">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">Operations</h3>
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider px-1">Operations</h3>
               <StatsCard
                 title="Active Loads"
                 value={stats?.active_loads || 0}
@@ -3201,13 +3178,13 @@ function Dashboard({ user, onLogout }) {
         {activeTab === 'sites' && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Site Inventory Management</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Site Inventory Management</h2>
               <div className="flex items-center gap-3">
                 {/* Customer Filter Dropdown */}
                 <select
                   value={customerFilter}
                   onChange={(e) => setCustomerFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
                 >
                   <option value="">All Customers</option>
                   {customers.map(c => (
