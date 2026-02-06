@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models import Escalation, EscalationStatus, EscalationPriority, IssueType, User
 from app.schemas import (
-from app.auth import get_current_user
     EscalationCreate, EscalationUpdate, EscalationResponse, EscalationWithDetails
 )
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/escalations", tags=["escalations"])
 

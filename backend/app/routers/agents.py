@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import AIAgent, AgentStatus, Site, Activity, ActivityType, User
+from app.models import AIAgent, AgentStatus, Site, Activity, ActivityType, User, AgentRunHistory
 from app.schemas import (
-from app.auth import get_current_user
     AIAgentCreate, AIAgentUpdate, AIAgentResponse, AIAgentWithSites,
-    ActivityCreate, ActivityResponse, AIAgentSiteAssignment
+    ActivityCreate, ActivityResponse, AIAgentSiteAssignment, AgentRunHistoryResponse
 )
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -345,3 +345,57 @@ def get_scheduler_jobs():
     from app.agents.agent_scheduler import get_scheduled_jobs
     jobs = get_scheduled_jobs()
     return {"jobs": jobs}
+
+
+# ============== Run History Endpoints ==============
+
+@router.get("/{agent_id}/run-history", response_model=List[AgentRunHistoryResponse])
+def get_agent_run_history(
+    agent_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get run history for a specific agent.
+
+    Returns a list of agent runs with details about what was analyzed,
+    decisions made, and actions taken.
+    """
+    from app.models import AgentRunStatus
+
+    db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
+    if not db_agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    query = db.query(AgentRunHistory).filter(AgentRunHistory.agent_id == agent_id)
+
+    if status:
+        try:
+            run_status = AgentRunStatus(status.upper())
+            query = query.filter(AgentRunHistory.status == run_status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+    return query.order_by(AgentRunHistory.started_at.desc()).offset(skip).limit(limit).all()
+
+
+@router.get("/run-history/recent", response_model=List[AgentRunHistoryResponse])
+def get_recent_run_history(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get recent run history across all agents.
+
+    Useful for the Agent Monitor dashboard to show recent activity.
+    """
+    return (
+        db.query(AgentRunHistory)
+        .order_by(AgentRunHistory.started_at.desc())
+        .limit(limit)
+        .all()
+    )

@@ -9,8 +9,11 @@ import {
   getActiveLoads,
   getOpenEscalations,
   getAgents,
+  updateAgent,
   runAgentCheck,
   getAgentActivities,
+  getAgentRunHistory,
+  getRecentRunHistory,
   getSentEmails,
   resolveEscalation,
   updateSite,
@@ -1309,6 +1312,14 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   const queryClient = useQueryClient()
   const [selectedAgentId, setSelectedAgentId] = useState(null)
   const [activityFilter, setActivityFilter] = useState('all')
+  const [showRunHistory, setShowRunHistory] = useState(true)
+
+  // Fetch run history for all agents
+  const { data: runHistory, isLoading: runHistoryLoading } = useQuery({
+    queryKey: ['agent-run-history'],
+    queryFn: () => getRecentRunHistory(30),
+    refetchInterval: 30000 // Refresh every 30 seconds
+  })
 
   const { data: allActivities } = useQuery({
     queryKey: ['all-agent-activities'],
@@ -1464,6 +1475,147 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
         })}
       </div>
 
+      {/* Run History Panel */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div
+          className="px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between cursor-pointer"
+          onClick={() => setShowRunHistory(!showRunHistory)}
+        >
+          <div className="flex items-center gap-2">
+            <History className="h-6 w-6" />
+            <h3 className="text-lg font-bold">Agent Run History</h3>
+            <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+              {runHistory?.length || 0} runs
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={(e) => { e.stopPropagation(); queryClient.invalidateQueries(['agent-run-history']) }}
+              className="p-1 hover:bg-white/20 rounded"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            {showRunHistory ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </div>
+        </div>
+
+        {showRunHistory && (
+          <div className="max-h-[400px] overflow-y-auto">
+            {runHistoryLoading ? (
+              <div className="p-8 text-center text-gray-500">
+                <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin text-emerald-500" />
+                <p>Loading run history...</p>
+              </div>
+            ) : !runHistory?.length ? (
+              <div className="p-8 text-center text-gray-500">
+                <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No agent runs recorded yet.</p>
+                <p className="text-sm mt-1">Run an agent check to see execution metrics.</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {runHistory.map((run) => {
+                  const agent = agents?.find(a => a.id === run.agent_id)
+                  const statusColors = {
+                    running: 'bg-blue-100 text-blue-700 border-blue-300',
+                    completed: 'bg-green-100 text-green-700 border-green-300',
+                    failed: 'bg-red-100 text-red-700 border-red-300',
+                    timeout: 'bg-orange-100 text-orange-700 border-orange-300'
+                  }
+
+                  return (
+                    <div key={run.id} className="p-4 hover:bg-gray-50 transition">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            run.status === 'completed' ? 'bg-green-100' :
+                            run.status === 'running' ? 'bg-blue-100' :
+                            run.status === 'failed' ? 'bg-red-100' : 'bg-gray-100'
+                          }`}>
+                            {run.status === 'running' ? (
+                              <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                            ) : run.status === 'completed' ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : run.status === 'failed' ? (
+                              <XCircle className="h-5 w-5 text-red-600" />
+                            ) : (
+                              <Clock className="h-5 w-5 text-orange-600" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">
+                                {agent?.agent_name || `Agent #${run.agent_id}`}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded border ${statusColors[run.status] || statusColors.completed}`}>
+                                {run.status?.toUpperCase()}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs rounded ${
+                                run.execution_mode === 'full_auto' ? 'bg-green-100 text-green-700' :
+                                run.execution_mode === 'auto_email' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {run.execution_mode?.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-0.5">
+                              Started {new Date(run.started_at).toLocaleString()}
+                              {run.duration_seconds && ` • ${run.duration_seconds.toFixed(1)}s`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Run Metrics */}
+                      <div className="mt-3 grid grid-cols-6 gap-2">
+                        <div className="text-center p-2 bg-gray-50 rounded">
+                          <p className="text-lg font-bold text-gray-900">{run.sites_checked || 0}</p>
+                          <p className="text-xs text-gray-500">Sites</p>
+                        </div>
+                        <div className="text-center p-2 bg-gray-50 rounded">
+                          <p className="text-lg font-bold text-gray-900">{run.loads_checked || 0}</p>
+                          <p className="text-xs text-gray-500">Loads</p>
+                        </div>
+                        <div className="text-center p-2 bg-blue-50 rounded">
+                          <p className="text-lg font-bold text-blue-600">{run.emails_sent || 0}</p>
+                          <p className="text-xs text-gray-500">Emails</p>
+                        </div>
+                        <div className="text-center p-2 bg-red-50 rounded">
+                          <p className="text-lg font-bold text-red-600">{run.escalations_created || 0}</p>
+                          <p className="text-xs text-gray-500">Escalations</p>
+                        </div>
+                        <div className="text-center p-2 bg-purple-50 rounded">
+                          <p className="text-lg font-bold text-purple-600">{run.api_calls || 0}</p>
+                          <p className="text-xs text-gray-500">API Calls</p>
+                        </div>
+                        <div className="text-center p-2 bg-amber-50 rounded">
+                          <p className="text-lg font-bold text-amber-600">{run.tokens_used || 0}</p>
+                          <p className="text-xs text-gray-500">Tokens</p>
+                        </div>
+                      </div>
+
+                      {/* Error Message */}
+                      {run.error_message && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                          {run.error_message}
+                        </div>
+                      )}
+
+                      {/* Decisions Summary */}
+                      {run.decisions?.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          {run.decisions.length} decision(s) made during run
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Activity Stream */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="px-6 py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white flex items-center justify-between">
@@ -1604,8 +1756,33 @@ function AgentManagementPanel({ agents, sites }) {
     }
   })
 
+  const updateModeMutation = useMutation({
+    mutationFn: ({ agentId, executionMode }) => updateAgent(agentId, { execution_mode: executionMode }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['agents'])
+    }
+  })
+
   const getAgentSites = (agentId) => {
     return sites?.filter(s => s.assigned_agent_id === agentId) || []
+  }
+
+  const getExecutionModeLabel = (mode) => {
+    switch (mode) {
+      case 'draft_only': return 'Draft Only'
+      case 'auto_email': return 'Auto Email'
+      case 'full_auto': return 'Full Auto'
+      default: return mode
+    }
+  }
+
+  const getExecutionModeColor = (mode) => {
+    switch (mode) {
+      case 'draft_only': return 'bg-gray-100 text-gray-700 border-gray-300'
+      case 'auto_email': return 'bg-blue-100 text-blue-700 border-blue-300'
+      case 'full_auto': return 'bg-green-100 text-green-700 border-green-300'
+      default: return 'bg-gray-100 text-gray-700 border-gray-300'
+    }
   }
 
   return (
@@ -1642,6 +1819,21 @@ function AgentManagementPanel({ agents, sites }) {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Execution Mode Dropdown */}
+                    <select
+                      value={agent.execution_mode || 'draft_only'}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        updateModeMutation.mutate({ agentId: agent.id, executionMode: e.target.value })
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`text-xs font-medium px-2 py-1 rounded border cursor-pointer ${getExecutionModeColor(agent.execution_mode)}`}
+                      title="Execution Mode - Controls agent autonomy level"
+                    >
+                      <option value="draft_only">Draft Only (Safe)</option>
+                      <option value="auto_email">Auto Email</option>
+                      <option value="full_auto">Full Auto</option>
+                    </select>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()

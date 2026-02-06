@@ -379,3 +379,53 @@ class EmailLog(Base):
     carrier = relationship("Carrier", back_populates="email_logs")
     sent_by_user = relationship("User", foreign_keys=[sent_by_user_id])
     sent_by_agent = relationship("AIAgent", foreign_keys=[sent_by_agent_id])
+
+
+class AgentRunStatus(str, enum.Enum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+
+
+class AgentRunHistory(Base):
+    """
+    Tracks each execution of an AI agent for observability and debugging.
+
+    Records what the agent analyzed, what decisions it made, and outcomes.
+    """
+    __tablename__ = "agent_run_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(Integer, ForeignKey("ai_agents.id"), nullable=False, index=True)
+
+    # Run timing
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+
+    # Run status
+    status = Column(Enum(AgentRunStatus), default=AgentRunStatus.RUNNING, nullable=False)
+    error_message = Column(Text, nullable=True)
+
+    # Execution mode at time of run
+    execution_mode = Column(Enum(AgentExecutionMode), nullable=False)
+
+    # What the agent analyzed
+    sites_checked = Column(Integer, default=0)
+    loads_checked = Column(Integer, default=0)
+
+    # Actions taken (or would-be taken in DRAFT_ONLY mode)
+    emails_sent = Column(Integer, default=0)
+    escalations_created = Column(Integer, default=0)
+    draft_actions = Column(Integer, default=0)  # Actions blocked by execution mode
+
+    # Decision summary (lightweight JSON)
+    decisions = Column(JSON, default=list)  # List of decision codes/summaries
+
+    # Claude API usage (for cost tracking)
+    api_calls = Column(Integer, default=0)
+    tokens_used = Column(Integer, default=0)
+
+    # Relationships
+    agent = relationship("AIAgent", backref="run_history")

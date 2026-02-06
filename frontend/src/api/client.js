@@ -3,8 +3,14 @@ import axios from 'axios'
 // Use environment variable or fallback to localhost for development
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
+// Demo admin token (long-lived for demo purposes)
+const DEMO_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTgwMTg4NDQ2OX0.IgePuwde-foLHgtCLhTenhY5dFOJ3vC4EukqLM5o9cE'
+
 const api = axios.create({
   baseURL: API_BASE_URL,
+  headers: {
+    'Authorization': `Bearer ${DEMO_TOKEN}`
+  }
 })
 
 // Dashboard
@@ -47,10 +53,15 @@ export const getCarriers = () => api.get('/carriers/').then(res => res.data)
 // Agents
 export const getAgents = () => api.get('/agents/').then(res => res.data)
 export const getAgent = (id) => api.get(`/agents/${id}`).then(res => res.data)
+export const updateAgent = (id, data) => api.patch(`/agents/${id}`, data).then(res => res.data)
 export const runAgentCheck = (id) => api.post(`/agents/${id}/run-check`).then(res => res.data)
 export const startAgent = (id) => api.post(`/agents/${id}/start`).then(res => res.data)
 export const stopAgent = (id) => api.post(`/agents/${id}/stop`).then(res => res.data)
 export const getAgentActivities = (id) => api.get(`/agents/${id}/activities`).then(res => res.data)
+export const getAgentRunHistory = (id, limit = 20) =>
+  api.get(`/agents/${id}/run-history?limit=${limit}`).then(res => res.data)
+export const getRecentRunHistory = (limit = 20) =>
+  api.get(`/agents/run-history/recent?limit=${limit}`).then(res => res.data)
 export const assignSitesToAgent = (agentId, siteIds) =>
   api.post(`/agents/${agentId}/assign-sites`, { site_ids: siteIds }).then(res => res.data)
 

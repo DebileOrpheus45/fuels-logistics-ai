@@ -227,6 +227,30 @@ class AIAgentWithSites(AIAgentResponse):
     assigned_sites: List[SiteResponse] = []
 
 
+# ============== Agent Run History Schemas ==============
+
+class AgentRunHistoryResponse(BaseModel):
+    """Response schema for agent run history entries."""
+    id: int
+    agent_id: int
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+    status: str  # AgentRunStatus enum value
+    error_message: Optional[str] = None
+    execution_mode: str  # AgentExecutionMode enum value
+    sites_checked: int = 0
+    loads_checked: int = 0
+    emails_sent: int = 0
+    escalations_created: int = 0
+    draft_actions: int = 0
+    decisions: Optional[List[Dict[str, Any]]] = None
+    api_calls: int = 0
+    tokens_used: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ============== Activity Schemas ==============
 
 class ActivityBase(BaseModel):

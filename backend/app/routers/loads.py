@@ -8,10 +8,8 @@ from sqlalchemy import and_, or_
 
 from app.database import get_db
 from app.models import Load, LoadStatus, Site, Carrier, User
-from app.schemas import (
+from app.schemas import LoadCreate, LoadUpdate, LoadResponse, LoadWithDetails
 from app.auth import get_current_user
-    LoadCreate, LoadUpdate, LoadResponse, LoadWithDetails
-)
 
 router = APIRouter(prefix="/api/loads", tags=["loads"])
 

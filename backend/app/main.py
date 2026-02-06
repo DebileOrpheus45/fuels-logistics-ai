@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from app.database import engine, Base
 from app.config import get_settings
@@ -8,22 +9,38 @@ from app.routers import sites, loads, agents, escalations, carriers, emails, sna
 from app.schemas import DashboardStats
 from app.auth import get_current_user
 from app.models import User
+from app.logging_config import setup_logging, get_logger
 
 settings = get_settings()
+
+# Initialize structured logging
+# Use JSON logs in production (DEBUG=false), console logs in development
+setup_logging(
+    json_logs=not settings.debug,
+    log_level=settings.log_level if hasattr(settings, 'log_level') else "INFO"
+)
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create database tables
+    # Startup
+    logger.info("application_startup", version="0.4.0")
+
+    # Create database tables
     Base.metadata.create_all(bind=engine)
+    logger.info("database_initialized")
 
     # Start agent scheduler
     from app.agents.agent_scheduler import start_scheduler, stop_scheduler
     start_scheduler()
+    logger.info("agent_scheduler_started")
 
     yield
 
-    # Shutdown: stop scheduler
+    # Shutdown
+    logger.info("application_shutdown")
     stop_scheduler()
 
 
@@ -69,8 +86,33 @@ def root():
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+    """
+    Health check endpoint for monitoring and load balancers.
+
+    Returns database connectivity status and basic system info.
+    """
+    from app.database import SessionLocal
+    from sqlalchemy import text
+
+    health = {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "0.4.0",
+        "checks": {}
+    }
+
+    # Check database connectivity
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        health["checks"]["database"] = "ok"
+    except Exception as e:
+        health["status"] = "unhealthy"
+        health["checks"]["database"] = f"error: {str(e)}"
+        logger.error("health_check_failed", component="database", error=str(e))
+
+    return health
 
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
