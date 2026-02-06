@@ -43,7 +43,9 @@ npm run dev
 # Access: http://localhost:5173
 ```
 
-**Login:** coordinator / fuel2024
+**Login credentials:**
+- `admin / admin123` (Admin role)
+- `coordinator / fuel2024` (Operator role)
 
 ### Optional: Email Integration
 
@@ -102,6 +104,14 @@ python start_email_poller.py
 - ✅ Site-specific notes and constraints
 - ✅ Staleness detection and overnight-aware escalations
 
+### Production Features (New)
+- ✅ JWT authentication with real login flow
+- ✅ Agent execution modes (Draft Only / Auto Email / Full Auto)
+- ✅ Structured JSON logging with structlog
+- ✅ Agent run history tracking with execution metrics
+- ✅ CSV export for run history data
+- ✅ Google Sheets integration for dashboard sync
+
 ### Tech Stack
 
 **Backend:**
@@ -109,6 +119,10 @@ python start_email_poller.py
 - Anthropic Claude API for AI agents
 - APScheduler for automated checks
 - Docker for database containerization
+- JWT authentication with python-jose
+- Structlog for production logging
+- SendGrid / Gmail for email delivery
+- Google Sheets API (gspread) for dashboard sync
 
 **Frontend:**
 - React 18 + Vite
@@ -116,6 +130,7 @@ python start_email_poller.py
 - TailwindCSS for styling
 - Lucide React icons
 - Leaflet.js for interactive GPS maps
+- JWT token management with localStorage
 - Environment-aware API configuration
 
 ---
@@ -213,12 +228,23 @@ For questions or issues:
 
 ## Recent Updates (February 2026)
 
-**Latest Improvements:**
-- ✅ **Gmail IMAP Email Poller** - Automated carrier ETA reply processing ($0 free solution)
-- ✅ **Environment-Aware Frontend** - Dynamic API URL configuration for production deployment
-- ✅ **Realistic Demo Data** - Professional company names and real US addresses
-- ✅ **Error Handling & Loading States** - Improved UX with retry logic and status banners
-- ✅ **Claude Sonnet 4.5 Integration** - Updated to latest 2026 model
+**Week 6 - Production Observability:**
+- ✅ **Structured JSON Logging** - Production-ready logging with structlog
+- ✅ **Agent Run History** - Track execution metrics (duration, sites checked, emails sent, API calls, tokens used)
+- ✅ **Agent Monitor UI** - Real-time run history panel with collapsible metrics view
+- ✅ **CSV Export** - Download run history data for analysis
+
+**Week 5 - Agent Safety:**
+- ✅ **Execution Modes** - Graduated autonomy (Draft Only / Auto Email / Full Auto)
+- ✅ **UI Mode Toggle** - Admin control of agent autonomy level
+
+**Week 3 - Email Integration:**
+- ✅ **SendGrid Integration** - Production email sending with audit trail
+- ✅ **Gmail IMAP Poller** - Automated carrier ETA reply processing
+
+**Earlier Updates:**
+- ✅ **JWT Authentication** - Secure API with role-based access
+- ✅ **Google Sheets Integration** - Sync dashboard to external spreadsheets
 - ✅ **Interactive Load Tracking** - GPS route visualization with Leaflet.js
 - ✅ **Staleness Detection** - Automated monitoring of data freshness
 - ✅ **Overnight-Aware Escalations** - Time-based urgency logic
@@ -227,5 +253,5 @@ See [INGESTION-ROADMAP.md](INGESTION-ROADMAP.md) for email automation roadmap.
 
 ---
 
-**Version:** 0.4.0 (Pre-Demo)
-**Last Updated:** February 5, 2026
+**Version:** 0.4.0 (Production Ready)
+**Last Updated:** February 6, 2026
