@@ -3115,7 +3115,7 @@ function Dashboard({ user, onLogout }) {
         <div className="flex gap-6">
           {/* Left Sidebar - Tab Navigation */}
           <div className="w-48 flex-shrink-0">
-            <nav className="space-y-1">
+            <nav className="flex flex-col gap-1 h-[360px]">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: Activity },
                 { id: 'sites', label: 'Sites', icon: Fuel },
@@ -3130,7 +3130,7 @@ function Dashboard({ user, onLogout }) {
                     setActiveTab(id)
                     if (id !== 'sites') setSiteFilter('all')
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  className={`flex-1 flex items-center gap-3 px-3 text-sm font-medium rounded-lg transition-colors ${
                     activeTab === id
                       ? 'bg-slate-900 text-white'
                       : 'text-slate-600 hover:bg-slate-100'
