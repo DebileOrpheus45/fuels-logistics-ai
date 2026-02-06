@@ -3061,96 +3061,86 @@ function Dashboard({ user, onLogout }) {
           onViewAll={() => setActiveTab('escalations')}
         />
 
-        {/* Tab Navigation */}
-        <div className="flex gap-1 mb-6 border-b border-slate-200">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: Activity },
-            { id: 'sites', label: 'Sites', icon: Fuel },
-            { id: 'loads', label: 'Loads', icon: Truck },
-            { id: 'agent-monitor', label: 'Agent Monitor', icon: Bot },
-            { id: 'escalations', label: 'Escalations', icon: Bell },
-            { id: 'sheets', label: 'Google Sheets', icon: FileSpreadsheet }
-          ].map(({ id, label, icon: TabIcon }) => (
-            <button
-              key={id}
-              onClick={() => {
-                setActiveTab(id)
-                if (id !== 'sites') setSiteFilter('all')
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors relative ${
-                activeTab === id
-                  ? 'text-slate-900'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <TabIcon className="h-4 w-4" />
-              {label}
-              {activeTab === id && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900" />
-              )}
-            </button>
-          ))}
+        {/* Stats Cards Row */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+          <StatsCard
+            title="Sites at Risk"
+            value={stats?.sites_at_risk || 0}
+            icon={AlertTriangle}
+            color={stats?.sites_at_risk > 0 ? 'red' : 'green'}
+            clickable
+            onClick={() => handleStatClick('at-risk', 'sites')}
+          />
+          <StatsCard
+            title="Open Escalations"
+            value={stats?.open_escalations || 0}
+            icon={Bell}
+            color={stats?.open_escalations > 0 ? 'red' : 'green'}
+            clickable
+            onClick={() => setActiveTab('escalations')}
+          />
+          <StatsCard
+            title="Delayed Loads"
+            value={stats?.delayed_loads || 0}
+            icon={Clock}
+            color={stats?.delayed_loads > 0 ? 'yellow' : 'green'}
+            clickable
+            onClick={() => {
+              setLoadStatusFilter('DELAYED')
+              setActiveTab('loads')
+            }}
+          />
+          <StatsCard
+            title="Active Loads"
+            value={stats?.active_loads || 0}
+            icon={Truck}
+            color="blue"
+            clickable
+            onClick={() => {
+              setLoadStatusFilter('all')
+              setActiveTab('loads')
+            }}
+          />
+          <StatsCard
+            title="Total Sites"
+            value={stats?.total_sites || 0}
+            icon={Fuel}
+            color="blue"
+            clickable
+            onClick={() => handleStatClick('all', 'sites')}
+          />
         </div>
 
-        {/* Main Layout: Sidebar + Content */}
+        {/* Main Layout: Nav Sidebar + Content */}
         <div className="flex gap-6">
-          {/* Left Sidebar - Status Cards (Always Visible) */}
-          <div className="w-64 flex-shrink-0 space-y-4">
-            {/* CRITICAL METRICS */}
-            <div className="space-y-3">
-              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider px-1">Critical</h3>
-              <StatsCard
-                title="Sites at Risk"
-                value={stats?.sites_at_risk || 0}
-                icon={AlertTriangle}
-                color={stats?.sites_at_risk > 0 ? 'red' : 'green'}
-                clickable
-                onClick={() => handleStatClick('at-risk', 'sites')}
-              />
-              <StatsCard
-                title="Open Escalations"
-                value={stats?.open_escalations || 0}
-                icon={Bell}
-                color={stats?.open_escalations > 0 ? 'red' : 'green'}
-                clickable
-                onClick={() => setActiveTab('escalations')}
-              />
-              <StatsCard
-                title="Delayed Loads"
-                value={stats?.delayed_loads || 0}
-                icon={Clock}
-                color={stats?.delayed_loads > 0 ? 'yellow' : 'green'}
-                clickable
-                onClick={() => {
-                  setLoadStatusFilter('DELAYED')
-                  setActiveTab('loads')
-                }}
-              />
-            </div>
-
-            {/* OPERATIONAL METRICS */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider px-1">Operations</h3>
-              <StatsCard
-                title="Active Loads"
-                value={stats?.active_loads || 0}
-                icon={Truck}
-                color="blue"
-                clickable
-                onClick={() => {
-                  setLoadStatusFilter('all')
-                  setActiveTab('loads')
-                }}
-              />
-              <StatsCard
-                title="Total Sites"
-                value={stats?.total_sites || 0}
-                icon={Fuel}
-                color="blue"
-                clickable
-                onClick={() => handleStatClick('all', 'sites')}
-              />
-            </div>
+          {/* Left Sidebar - Tab Navigation */}
+          <div className="w-48 flex-shrink-0">
+            <nav className="space-y-1">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: Activity },
+                { id: 'sites', label: 'Sites', icon: Fuel },
+                { id: 'loads', label: 'Loads', icon: Truck },
+                { id: 'agent-monitor', label: 'Agent Monitor', icon: Bot },
+                { id: 'escalations', label: 'Escalations', icon: Bell },
+                { id: 'sheets', label: 'Google Sheets', icon: FileSpreadsheet }
+              ].map(({ id, label, icon: TabIcon }) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setActiveTab(id)
+                    if (id !== 'sites') setSiteFilter('all')
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    activeTab === id
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <TabIcon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+            </nav>
           </div>
 
           {/* Main Content Area */}
