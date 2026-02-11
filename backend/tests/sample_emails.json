@@ -122,9 +122,10 @@
     "body": "Hey, regarding PO-2024-004 - driver should be there around 1430.\n\nThanks,\nAEC Dispatch",
     "from_email": "dispatch@americanenergy.com",
     "expected_po": "PO-2024-004",
-    "expected_eta_time": "2024",
+    "expected_eta_time": "1430",
+    "expected_eta_time_regex": "2024",
     "should_parse": true,
-    "known_bug": "Parser matches '2024' from PO number as military time before reaching '1430'"
+    "note": "LLM correctly ignores PO number digits; regex matches '2024' from PO-2024-004 as military time"
   },
   {
     "description": "No PO number anywhere",
@@ -141,9 +142,10 @@
     "body": "Hi,\n\nI checked with the driver and here's the latest. He had to stop for a DOT inspection at the weigh station outside of Katy but he's back on the road now. He said everything went fine, no issues with the truck or paperwork.\n\nBased on where he is right now he should be pulling into the site around 4:30 PM. I'll have him call the site contact 30 minutes before arrival.\n\nLet me know if you need anything else.\n\nBest regards,\nTom Henderson\nDispatch Manager\nNationwide Fuel Transport\n(817) 555-0245",
     "from_email": "dispatch@nfttransport.com",
     "expected_po": "PO-2024-005",
-    "expected_eta_time": "0245",
+    "expected_eta_time": "1630",
+    "expected_eta_time_regex": "0245",
     "should_parse": true,
-    "known_bug": "Parser matches '0245' from phone number (555-0245) as military time before reaching '4:30 PM'"
+    "note": "LLM correctly ignores phone number digits; regex matches '0245' from (817) 555-0245 as military time"
   },
   {
     "description": "Midnight/early morning military time",
