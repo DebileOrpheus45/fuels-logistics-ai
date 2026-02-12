@@ -301,7 +301,7 @@ def main():
     poller = GmailETAPoller(
         email_address=email_address,
         password=password,
-        check_interval=600,  # 10 minutes
+        check_interval=30,  # 30 seconds for responsive polling
         api_base_url="http://localhost:8000"
     )
 

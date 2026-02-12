@@ -12,9 +12,11 @@ import {
   updateAgent,
   runAgentCheck,
   getAgentActivities,
+  getAllActivities,
   getAgentRunHistory,
   getRecentRunHistory,
   getSentEmails,
+  getInboundEmails,
   resolveEscalation,
   updateSite,
   batchUpdateSites,
@@ -76,7 +78,8 @@ import {
   ArrowDown,
   ArrowUpDown,
   Search,
-  XCircle
+  XCircle,
+  AlertCircle
 } from 'lucide-react'
 
 // ============== Login Page ==============
@@ -478,14 +481,16 @@ function EscalationModal({ escalation, onClose, onResolve }) {
 function EmailDetailModal({ email, onClose }) {
   if (!email) return null
 
+  const isInbound = email._type === 'inbound'
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
-        <div className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+        <div className={`p-4 ${isInbound ? 'bg-slate-800' : 'bg-slate-700'} text-white`}>
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              <span className="font-medium">Email Details</span>
+              {isInbound ? <Mail className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+              <span className="font-medium">{isInbound ? 'Inbound Email' : 'Sent Email'}</span>
             </div>
             <button onClick={onClose} className="p-1 hover:bg-white/20 rounded">
               <X className="h-5 w-5" />
@@ -496,8 +501,10 @@ function EmailDetailModal({ email, onClose }) {
         <div className="p-6">
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase">To</label>
-              <p className="font-medium text-gray-900">{email.to}</p>
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                {isInbound ? 'From' : 'To'}
+              </label>
+              <p className="font-medium text-gray-900">{isInbound ? email.from_email : email.to}</p>
             </div>
 
             <div>
@@ -506,18 +513,57 @@ function EmailDetailModal({ email, onClose }) {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase">Sent At</label>
-              <p className="text-gray-700">{new Date(email.sent_at).toLocaleString()}</p>
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                {isInbound ? 'Received At' : 'Sent At'}
+              </label>
+              <p className="text-gray-700">
+                {new Date(isInbound ? email.received_at : email.sent_at).toLocaleString()}
+              </p>
             </div>
 
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase">Message</label>
-              <div className="mt-1 p-4 bg-gray-50 rounded-lg border text-sm whitespace-pre-wrap font-mono">
+              <div className="mt-1 p-4 bg-gray-50 rounded-lg border text-sm whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
                 {email.body || 'No body content available'}
               </div>
             </div>
 
-            {email.mock && (
+            {/* Inbound-specific: parse results */}
+            {isInbound && (
+              <div className="border-t pt-4 space-y-3">
+                <h4 className="text-xs font-medium text-gray-500 uppercase">Parse Results</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-xs text-gray-500">PO Number</span>
+                    <p className="text-sm font-medium text-gray-900">{email.po_number || '(not found)'}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Parse Method</span>
+                    <p className="text-sm font-medium text-gray-900">{email.parse_method?.toUpperCase() || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Parsed ETA</span>
+                    <p className="text-sm font-medium text-gray-900">
+                      {email.parsed_eta ? new Date(email.parsed_eta).toLocaleString() : '(none)'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Status</span>
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${
+                      email.parse_success ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {email.parse_success ? 'Success' : 'Needs Review'}
+                    </span>
+                  </div>
+                </div>
+                {email.parse_message && (
+                  <p className="text-xs text-gray-500 italic">{email.parse_message}</p>
+                )}
+              </div>
+            )}
+
+            {/* Sent-specific: mock warning */}
+            {!isInbound && email.mock && (
               <div className="flex items-center gap-2 text-amber-600 text-sm">
                 <AlertTriangle className="h-4 w-4" />
                 This was a mock email (Gmail not configured)
@@ -1324,21 +1370,16 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   })
 
   const { data: allActivities } = useQuery({
-    queryKey: ['all-agent-activities'],
+    queryKey: ['all-activities'],
     queryFn: async () => {
-      // Fetch activities for all agents
-      const results = await Promise.all(
-        (agents || []).map(agent => getAgentActivities(agent.id))
-      )
-      // Flatten and add agent info
-      return results.flatMap((activities, idx) =>
-        (activities || []).map(act => ({
-          ...act,
-          agent: agents[idx]
-        }))
-      ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      const activities = await getAllActivities(100)
+      // Enrich with agent info
+      return (activities || []).map(act => ({
+        ...act,
+        agent: (agents || []).find(a => a.id === act.agent_id) || null
+      }))
     },
-    enabled: !!agents?.length
+    refetchInterval: 15000,
   })
 
   const runCheckMutation = useMutation({
@@ -1364,11 +1405,14 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
 
   const getActivityIcon = (type) => {
     switch (type) {
-      case 'email_sent': return <Mail className="h-4 w-4 text-blue-600" />
+      case 'email_sent': return <Send className="h-4 w-4 text-blue-600" />
+      case 'email_received': return <Mail className="h-4 w-4 text-emerald-600" />
+      case 'eta_updated': return <Clock className="h-4 w-4 text-cyan-600" />
       case 'escalation_created': return <AlertTriangle className="h-4 w-4 text-red-600" />
       case 'observation': return <Eye className="h-4 w-4 text-gray-600" />
       case 'check_started': return <Play className="h-4 w-4 text-green-600" />
       case 'check_completed': return <CheckCircle className="h-4 w-4 text-green-600" />
+      case 'inventory_checked': return <Fuel className="h-4 w-4 text-amber-600" />
       default: return <Activity className="h-4 w-4 text-gray-600" />
     }
   }
@@ -1376,9 +1420,12 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   const getActivityStyles = (type) => {
     switch (type) {
       case 'email_sent': return 'border-l-blue-500 bg-blue-50'
+      case 'email_received': return 'border-l-emerald-500 bg-emerald-50'
+      case 'eta_updated': return 'border-l-cyan-500 bg-cyan-50'
       case 'escalation_created': return 'border-l-red-500 bg-red-50'
       case 'check_started': return 'border-l-green-500 bg-green-50'
       case 'check_completed': return 'border-l-green-500 bg-green-50'
+      case 'inventory_checked': return 'border-l-amber-500 bg-amber-50'
       default: return 'border-l-gray-300 bg-gray-50'
     }
   }
@@ -1677,11 +1724,11 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
               className="text-sm bg-gray-700 border-gray-600 rounded px-2 py-1 text-white"
             >
               <option value="all">All Types</option>
-              <option value="email_sent">Emails</option>
+              <option value="email_sent">Emails Sent</option>
+              <option value="email_received">Emails Received</option>
+              <option value="eta_updated">ETA Updated</option>
               <option value="escalation_created">Escalations</option>
-              <option value="observation">Observations</option>
-              <option value="check_started">Check Started</option>
-              <option value="check_completed">Check Completed</option>
+              <option value="inventory_checked">Inventory Checked</option>
             </select>
           </div>
         </div>
@@ -1694,7 +1741,25 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
             </div>
           ) : (
             <div className="divide-y">
-              {filteredActivities.map((activity) => (
+              {filteredActivities.map((activity) => {
+                const d = activity.details || {}
+                const getDescription = () => {
+                  switch (activity.activity_type) {
+                    case 'email_sent':
+                      return `Sent ETA request to ${d.to || d.carrier_name || 'carrier'}${d.po_number ? ` for ${d.po_number}` : ''}`
+                    case 'email_received':
+                      return `Received reply from ${d.from_email || 'carrier'}${d.po_number ? ` for ${d.po_number}` : ''}${d.parse_success ? ` — ETA parsed: ${d.parsed_eta ? new Date(d.parsed_eta).toLocaleString() : ''}` : ' — needs review'}`
+                    case 'eta_updated':
+                      return d.message || 'ETA updated'
+                    case 'escalation_created':
+                      return d.description || 'Escalation created'
+                    case 'inventory_checked':
+                      return d.message || 'Inventory checked'
+                    default:
+                      return d.message || d.description || activity.activity_type.replace(/_/g, ' ')
+                  }
+                }
+                return (
                 <div
                   key={activity.id}
                   className={`p-4 border-l-4 ${getActivityStyles(activity.activity_type)} hover:bg-opacity-75 transition`}
@@ -1705,55 +1770,28 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-gray-900 text-sm">
                           {activity.activity_type.replace(/_/g, ' ').toUpperCase()}
                         </span>
-                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                          {activity.agent?.agent_name}
-                        </span>
-                        {activity.site && (
+                        {activity.agent && (
+                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                            {activity.agent.agent_name}
+                          </span>
+                        )}
+                        {!activity.agent_id && (
+                          <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                            System
+                          </span>
+                        )}
+                        {d.po_number && (
                           <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                            Site: {activity.site.consignee_code}
+                            {d.po_number}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-600 mt-1">
-                        {activity.description}
+                        {getDescription()}
                       </p>
-                      {activity.details && (
-                        <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-x-auto">
-                          {typeof activity.details === 'string'
-                            ? activity.details
-                            : JSON.stringify(activity.details, null, 2)}
-                        </pre>
-                      )}
-
-                      {/* Clickable email link */}
-                      {activity.activity_type === 'email_sent' && (
-                        <button
-                          onClick={() => {
-                            const matchingEmail = emails?.emails?.find(e =>
-                              e.subject === activity.details?.subject ||
-                              e.to === activity.details?.to
-                            )
-                            if (matchingEmail) {
-                              onViewEmail(matchingEmail)
-                            } else if (activity.details) {
-                              onViewEmail({
-                                to: activity.details.to,
-                                subject: activity.details.subject,
-                                body: activity.details.body,
-                                sent_at: activity.created_at,
-                                mock: true
-                              })
-                            }
-                          }}
-                          className="mt-2 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View Email Content
-                        </button>
-                      )}
                     </div>
                     <div className="flex-shrink-0 text-right">
                       <p className="text-xs text-gray-500">
@@ -1765,7 +1803,7 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>
@@ -2775,39 +2813,111 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
 }
 
 // ============== Emails Panel ==============
-function EmailsPanel({ emails, onViewEmail }) {
+function EmailsPanel({ emails, inboundEmails, onViewEmail }) {
+  const [emailTab, setEmailTab] = useState('received')
+
+  const inboundList = Array.isArray(inboundEmails) ? inboundEmails : []
+
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-      <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <Mail className="h-5 w-5 text-slate-600" />
-          <h3 className="text-base font-semibold text-slate-900">Sent Communications</h3>
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-slate-600" />
+            <h3 className="text-base font-semibold text-slate-900">Email Communications</h3>
+          </div>
+          <div className="flex bg-slate-200 rounded-lg p-0.5">
+            <button
+              onClick={() => setEmailTab('received')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition ${
+                emailTab === 'received' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Received{inboundList.length > 0 && ` (${inboundList.length})`}
+            </button>
+            <button
+              onClick={() => setEmailTab('sent')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition ${
+                emailTab === 'sent' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Sent{emails?.emails?.length > 0 && ` (${emails.emails.length})`}
+            </button>
+          </div>
         </div>
       </div>
-      <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
-        {emails?.emails?.length === 0 && (
-          <p className="text-slate-400 text-center py-4 text-sm">No emails sent yet</p>
-        )}
-        {emails?.emails?.map((email, idx) => (
-          <div
-            key={idx}
-            className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
-            onClick={() => onViewEmail?.(email)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-slate-500" />
-                <span className="font-medium text-slate-700">{email.to}</span>
+
+      {/* Sent tab */}
+      {emailTab === 'sent' && (
+        <div className="p-4 space-y-2 max-h-72 overflow-y-auto">
+          {emails?.emails?.length === 0 && (
+            <p className="text-slate-400 text-center py-4 text-sm">No emails sent yet</p>
+          )}
+          {emails?.emails?.map((email, idx) => (
+            <div
+              key={idx}
+              className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
+              onClick={() => onViewEmail?.({ ...email, _type: 'sent' })}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm">
+                  <Send className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="font-medium text-slate-700">{email.to}</span>
+                </div>
+                <Eye className="h-4 w-4 text-slate-400" />
               </div>
-              <Eye className="h-4 w-4 text-slate-400" />
+              <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {new Date(email.sent_at).toLocaleString()}
+              </p>
             </div>
-            <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
-            <p className="text-xs text-slate-400 mt-1">
-              {new Date(email.sent_at).toLocaleString()}
-            </p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* Received tab */}
+      {emailTab === 'received' && (
+        <div className="p-4 space-y-2 max-h-72 overflow-y-auto">
+          {inboundList.length === 0 && (
+            <p className="text-slate-400 text-center py-4 text-sm">No inbound emails yet</p>
+          )}
+          {inboundList.map((email) => (
+            <div
+              key={email.id}
+              className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
+              onClick={() => onViewEmail?.({ ...email, _type: 'inbound' })}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="font-medium text-slate-700">{email.from_email}</span>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  email.parse_success
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-700'
+                }`}>
+                  {email.parse_success ? 'Parsed' : 'Needs Review'}
+                </span>
+              </div>
+              <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-xs text-slate-400">
+                  {email.received_at ? new Date(email.received_at).toLocaleString() : 'Unknown'}
+                </p>
+                {email.parsed_eta && (
+                  <p className="text-xs font-medium text-emerald-600">
+                    ETA: {new Date(email.parsed_eta).toLocaleString()}
+                  </p>
+                )}
+              </div>
+              {email.po_number && (
+                <p className="text-xs text-slate-500 mt-1">PO: {email.po_number}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2898,6 +3008,12 @@ function Dashboard({ user, onLogout }) {
   const { data: emails, isFetching: isEmailsFetching } = useQuery({
     queryKey: ['sent-emails'],
     queryFn: getSentEmails
+  })
+
+  const { data: inboundEmails } = useQuery({
+    queryKey: ['inbound-emails'],
+    queryFn: getInboundEmails,
+    refetchInterval: 30000,
   })
 
   const resolveMutation = useMutation({
@@ -3159,7 +3275,7 @@ function Dashboard({ user, onLogout }) {
             </div>
             <div className="space-y-6">
               <AgentManagementPanel agents={agents} sites={sites} />
-              <EmailsPanel emails={emails} onViewEmail={setSelectedEmail} />
+              <EmailsPanel emails={emails} inboundEmails={inboundEmails} onViewEmail={setSelectedEmail} />
             </div>
           </div>
         )}

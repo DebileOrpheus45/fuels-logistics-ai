@@ -60,6 +60,7 @@ class IssueType(str, enum.Enum):
 
 class ActivityType(str, enum.Enum):
     EMAIL_SENT = "email_sent"
+    EMAIL_RECEIVED = "email_received"
     DASHBOARD_UPDATED = "dashboard_updated"
     ESCALATION_CREATED = "escalation_created"
     INVENTORY_CHECKED = "inventory_checked"
@@ -215,6 +216,7 @@ class Load(Base):
     activities = relationship("Activity", back_populates="load")
     escalations = relationship("Escalation", back_populates="load")
     email_logs = relationship("EmailLog", back_populates="load")
+    inbound_emails = relationship("InboundEmail", back_populates="load")
 
     @property
     def is_eta_stale(self):
@@ -266,7 +268,7 @@ class Activity(Base):
     __tablename__ = "activities"
 
     id = Column(Integer, primary_key=True, index=True)
-    agent_id = Column(Integer, ForeignKey("ai_agents.id"), nullable=False)
+    agent_id = Column(Integer, ForeignKey("ai_agents.id"), nullable=True)
     activity_type = Column(Enum(ActivityType), nullable=False)
     load_id = Column(Integer, ForeignKey("loads.id"), nullable=True)
     details = Column(JSON, default=dict)
@@ -379,6 +381,32 @@ class EmailLog(Base):
     carrier = relationship("Carrier", back_populates="email_logs")
     sent_by_user = relationship("User", foreign_keys=[sent_by_user_id])
     sent_by_agent = relationship("AIAgent", foreign_keys=[sent_by_agent_id])
+
+
+class InboundEmail(Base):
+    """Stores inbound carrier email replies and their parse results."""
+    __tablename__ = "inbound_emails"
+
+    id = Column(Integer, primary_key=True, index=True)
+    from_email = Column(String(255), nullable=False, index=True)
+    subject = Column(String(500), nullable=False)
+    body = Column(Text, nullable=False)
+
+    # Extracted data
+    po_number = Column(String(100), nullable=True, index=True)
+    load_id = Column(Integer, ForeignKey("loads.id"), nullable=True)
+    parsed_eta = Column(DateTime, nullable=True)
+    parse_method = Column(String(20), nullable=True)  # "llm", "regex", or null
+    parse_success = Column(Boolean, default=False, nullable=False)
+    parse_message = Column(String(500), nullable=True)  # Human-readable result
+
+    # Timestamps
+    received_at = Column(DateTime, nullable=True)
+    processed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Relationships
+    load = relationship("Load", back_populates="inbound_emails")
 
 
 class AgentRunStatus(str, enum.Enum):

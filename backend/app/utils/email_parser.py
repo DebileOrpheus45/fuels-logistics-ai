@@ -35,17 +35,27 @@ def parse_eta_from_email(subject: str, body: str, sent_date: Optional[datetime] 
     Returns:
         datetime representing the ETA, or None if vague / unparseable.
     """
+    result, _ = parse_eta_from_email_with_method(subject, body, sent_date)
+    return result
+
+
+def parse_eta_from_email_with_method(subject: str, body: str, sent_date: Optional[datetime] = None) -> Tuple[Optional[datetime], Optional[str]]:
+    """
+    Parse ETA from carrier email reply. Returns (eta, method).
+    method is "llm", "regex", or None.
+    """
     if sent_date is None:
         sent_date = datetime.now()
 
     llm_result = _parse_with_llm(subject, body, sent_date)
     if llm_result is _LLM_NO_RESULT:
-        return None  # LLM explicitly says no ETA
+        return None, "llm"  # LLM explicitly says no ETA
     if llm_result is not None:
-        return llm_result  # LLM found a time
+        return llm_result, "llm"
 
     # LLM unavailable or errored -> regex fallback
-    return _parse_with_regex(subject, body, sent_date)
+    regex_result = _parse_with_regex(subject, body, sent_date)
+    return regex_result, "regex" if regex_result else None
 
 
 def extract_po_number(subject: str, body: str) -> Optional[str]:
@@ -80,7 +90,15 @@ def _get_anthropic_client():
     if _LLM_AVAILABLE is False:
         return None
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    # Try settings first (loads from .env via pydantic), then fall back to os.environ
+    api_key = ""
+    try:
+        from app.config import get_settings
+        api_key = get_settings().anthropic_api_key
+    except Exception:
+        pass
+    if not api_key:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         _LLM_AVAILABLE = False
         logger.info("No ANTHROPIC_API_KEY - email parser will use regex only")
@@ -146,6 +164,11 @@ def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[da
         )
 
         raw = response.content[0].text.strip()
+        logger.info(f"LLM raw response: {raw!r}")
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
         result = json.loads(raw)
 
         if result.get("status") == "ok":

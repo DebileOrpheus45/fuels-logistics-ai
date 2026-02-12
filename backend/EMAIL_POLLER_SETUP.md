@@ -1,7 +1,7 @@
 # Gmail ETA Reply Poller - Setup Guide
 
 ## Overview
-The Gmail IMAP poller automatically checks your Gmail inbox for carrier ETA replies and updates load ETAs in the database without any manual intervention.
+The Gmail IMAP poller automatically checks your Gmail inbox for carrier ETA replies, parses ETAs using LLM (Claude Haiku) with regex fallback, stores every inbound email for audit, updates load ETAs in the database, and logs activity to the Agent Activity Stream — all without manual intervention.
 
 ## Prerequisites
 
@@ -32,9 +32,9 @@ GMAIL_APP_PASSWORD=abcdefghijklmnop  # 16-char app password (no spaces)
 ```
 Agent sends email: "PO-2024-001, what's your ETA?"
     ↓
-Dispatcher replies via email: "1430"
+Dispatcher replies via email: "Driver arriving between 0400-0745"
     ↓
-IMAP poller checks inbox (every 10 minutes)
+IMAP poller checks inbox (every 30 seconds)
     ↓
 Finds unread email with subject "RE: ETA Request - PO-2024-001"
     ↓
@@ -42,11 +42,17 @@ Extracts subject, body, sender
     ↓
 Calls POST /api/email/inbound with parsed content
     ↓
-Parser extracts PO number and time
+LLM parser (Claude Haiku) extracts PO and ETA, regex fallback if LLM unavailable
     ↓
-Database updated: PO-2024-001.current_eta = 2:30 PM
+InboundEmail record saved (audit trail with parse method + result)
+    ↓
+Activity logged to Agent Activity Stream (EMAIL_RECEIVED)
+    ↓
+Database updated: PO-2024-001.current_eta = 7:45 AM
     ↓
 Email marked as read (won't be processed again)
+    ↓
+Frontend shows inbound email in Emails > Received tab + Agent Monitor stream
 ```
 
 ## Starting the Poller
@@ -94,10 +100,28 @@ Edit `backend/app/services/email_poller.py` to customize:
 poller = GmailETAPoller(
     email_address=email_address,
     password=password,
-    check_interval=600,  # 10 minutes (change to 300 for 5 min, 900 for 15 min)
+    check_interval=30,  # 30 seconds (default; change to 300 for 5 min, 600 for 10 min)
     api_base_url="http://localhost:8000"  # Change if API runs on different port
 )
 ```
+
+### ETA Parsing
+
+The parser uses a two-tier approach:
+1. **LLM (Claude Haiku)** — primary parser, handles natural language like "between 4 and 7:45 AM tomorrow"
+2. **Regex fallback** — if `ANTHROPIC_API_KEY` is not set or LLM fails
+
+The API key is read from `Settings` (via `.env`), not from `os.environ` directly.
+
+### Data Storage
+
+Every inbound email is stored in the `inbound_emails` table with:
+- Raw email content (from, subject, body)
+- Extracted PO number and parsed ETA
+- Parse method used (`llm` or `regex`) and success flag
+- Timestamps (received, processed)
+
+An `Activity` record (type `EMAIL_RECEIVED`) is also created for the Agent Activity Stream.
 
 ## Email Detection Rules
 
@@ -249,5 +273,26 @@ curl -X POST http://localhost:8000/api/email/inbound/test \
   -d '{"subject":"RE: ETA Request - PO-2024-001","body":"1430","from_email":"test@example.com"}'
 ```
 
+## API Endpoints
+
+### Inbound Emails
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/email/inbound` | Process an inbound carrier email (called by poller) |
+| `GET`  | `/api/email/inbound` | List recent inbound emails (for frontend Received tab) |
+| `POST` | `/api/email/inbound/test` | Test ETA parsing without saving to DB |
+
+### Activity Stream
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/api/agents/activities/all` | All activities (email sent/received, escalations, etc.) |
+
+## Frontend Integration
+
+- **Emails tab → Received**: Shows all inbound emails with parse status badges (Parsed / Needs Review), PO number, and parsed ETA
+- **Agent Monitor → Activity Stream**: Real-time feed of all email activity (sent and received), escalations, and agent actions — auto-refreshes every 15 seconds
+- Activities with no agent (system-level, like email polling) show a "System" badge
+
 ## Cost
 **$0** - Gmail IMAP is completely free with no rate limits for normal use.
+LLM parsing uses Claude Haiku (~$0.001 per email parsed).

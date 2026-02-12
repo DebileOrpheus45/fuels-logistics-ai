@@ -214,6 +214,19 @@ def delete_agent(agent_id: int, db: Session = Depends(get_db),
 
 # ============== Activity Endpoints ==============
 
+@router.get("/activities/all", response_model=List[ActivityResponse])
+def get_all_activities(
+    limit: int = Query(default=100, le=500),
+    activity_type: Optional[ActivityType] = None,
+    db: Session = Depends(get_db)
+):
+    """Get all activities across all agents (including system activities)."""
+    query = db.query(Activity)
+    if activity_type:
+        query = query.filter(Activity.activity_type == activity_type)
+    return query.order_by(Activity.created_at.desc()).limit(limit).all()
+
+
 @router.get("/{agent_id}/activities", response_model=List[ActivityResponse])
 def get_agent_activities(
     agent_id: int,

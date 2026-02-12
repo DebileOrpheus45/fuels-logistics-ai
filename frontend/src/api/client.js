@@ -108,6 +108,7 @@ export const runAgentCheck = (id) => api.post(`/agents/${id}/run-check`).then(re
 export const startAgent = (id) => api.post(`/agents/${id}/start`).then(res => res.data)
 export const stopAgent = (id) => api.post(`/agents/${id}/stop`).then(res => res.data)
 export const getAgentActivities = (id) => api.get(`/agents/${id}/activities`).then(res => res.data)
+export const getAllActivities = (limit = 100) => api.get(`/agents/activities/all?limit=${limit}`).then(res => res.data)
 export const getAgentRunHistory = (id, limit = 20) =>
   api.get(`/agents/${id}/run-history?limit=${limit}`).then(res => res.data)
 export const getRecentRunHistory = (limit = 20) =>
@@ -123,6 +124,7 @@ export const resolveEscalation = (id, notes) =>
 
 // Emails
 export const getSentEmails = () => api.get('/emails/sent').then(res => res.data)
+export const getInboundEmails = () => api.get('/email/inbound').then(res => res.data)
 
 // Google Sheets
 export const getSheetsStatus = () => api.get('/sheets/status').then(res => res.data)

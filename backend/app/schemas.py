@@ -254,7 +254,7 @@ class AgentRunHistoryResponse(BaseModel):
 # ============== Activity Schemas ==============
 
 class ActivityBase(BaseModel):
-    agent_id: int
+    agent_id: Optional[int] = None
     activity_type: ActivityType
     load_id: Optional[int] = None
     details: Optional[Dict[str, Any]] = {}

@@ -11,6 +11,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from app.config import get_settings
+from app.database import SessionLocal
+from app.models import Activity, ActivityType
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -176,6 +178,7 @@ Fuels Logistics AI Coordinator"""
             result = self._send_mock(to_email, subject, body, po_number, carrier_name, site_name)
 
         # Store in history
+        sent_at = result.get("sent_at", datetime.utcnow().isoformat())
         self.sent_emails.append({
             "to": to_email,
             "subject": subject,
@@ -183,10 +186,33 @@ Fuels Logistics AI Coordinator"""
             "po_number": po_number,
             "carrier_name": carrier_name,
             "site_name": site_name,
-            "sent_at": result.get("sent_at", datetime.utcnow().isoformat()),
+            "sent_at": sent_at,
             "success": result.get("success", False),
             "method": result.get("method", "unknown")
         })
+
+        # Log to activity stream
+        try:
+            db = SessionLocal()
+            activity = Activity(
+                agent_id=None,
+                activity_type=ActivityType.EMAIL_SENT,
+                details={
+                    "to": to_email,
+                    "subject": subject,
+                    "po_number": po_number,
+                    "carrier_name": carrier_name,
+                    "site_name": site_name,
+                    "sent_at": sent_at,
+                    "method": result.get("method", "unknown"),
+                    "success": result.get("success", False),
+                },
+            )
+            db.add(activity)
+            db.commit()
+            db.close()
+        except Exception as e:
+            logger.warning(f"Failed to log email activity: {e}")
 
         return result
 

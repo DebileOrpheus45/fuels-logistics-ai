@@ -2,16 +2,15 @@
 API endpoints for processing inbound carrier email replies.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from app.database import get_db
-from app.models import Load, Activity, ActivityType, User
-from app.utils.email_parser import parse_eta_from_email, extract_po_number
-from app.auth import get_current_user
+from app.models import Load, InboundEmail, Activity, ActivityType
+from app.utils.email_parser import parse_eta_from_email_with_method, extract_po_number
 
 router = APIRouter(prefix="/api/email", tags=["email"])
 
@@ -32,6 +31,24 @@ class InboundEmailResponse(BaseModel):
     message: str
 
 
+class InboundEmailOut(BaseModel):
+    """Response model for listing inbound emails."""
+    id: int
+    from_email: str
+    subject: str
+    body: str
+    po_number: Optional[str] = None
+    parsed_eta: Optional[datetime] = None
+    parse_method: Optional[str] = None
+    parse_success: bool
+    parse_message: Optional[str] = None
+    received_at: Optional[datetime] = None
+    processed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 @router.post("/inbound", response_model=InboundEmailResponse)
 def process_inbound_email(
     email: InboundEmailRequest,
@@ -39,61 +56,93 @@ def process_inbound_email(
 ):
     """
     Process inbound carrier email reply and update load ETA.
-
-    Expected email formats:
-    - Subject: "RE: ETA Request - PO-2024-001"
-    - Body: "0600" or "between 1200 and 1400" or "3 PM"
-
-    Returns:
-        - success: Whether ETA was successfully parsed and updated
-        - po_number: Extracted PO number
-        - parsed_eta: Parsed ETA datetime
-        - message: Human-readable status message
+    Saves every inbound email for audit trail regardless of parse outcome.
     """
+    received_at = email.received_at or datetime.now()
+
     # Extract PO number from subject or body
     po_number = extract_po_number(email.subject, email.body)
-    if not po_number:
-        return InboundEmailResponse(
-            success=False,
-            message="Could not extract PO number from email"
-        )
 
-    # Find the load
-    load = db.query(Load).filter(Load.po_number == po_number).first()
-    if not load:
-        return InboundEmailResponse(
-            success=False,
-            po_number=po_number,
-            message=f"Load not found: {po_number}"
-        )
+    # Find the load (if PO found)
+    load = None
+    if po_number:
+        load = db.query(Load).filter(Load.po_number == po_number).first()
 
     # Parse ETA from email body
-    received_at = email.received_at or datetime.now()
-    parsed_eta = parse_eta_from_email(email.subject, email.body, received_at)
+    parsed_eta, parse_method = parse_eta_from_email_with_method(email.subject, email.body, received_at)
 
-    if not parsed_eta:
-        # Vague response - skip activity logging (no agent involved)
-        return InboundEmailResponse(
-            success=False,
-            po_number=po_number,
-            message="Vague ETA response - requires manual follow-up"
-        )
+    # Build result message
+    if not po_number:
+        success = False
+        message = "Could not extract PO number from email"
+    elif not load:
+        success = False
+        message = f"Load not found: {po_number}"
+    elif not parsed_eta:
+        success = False
+        message = "Vague ETA response - requires manual follow-up"
+    else:
+        success = True
+        old_eta = load.current_eta
+        load.current_eta = parsed_eta
+        load.last_eta_update_at = datetime.now()
+        message = f"ETA updated from {old_eta} to {parsed_eta.strftime('%Y-%m-%d %H:%M')}"
 
-    # Update load ETA
-    old_eta = load.current_eta
-    load.current_eta = parsed_eta
-    load.last_eta_update_at = datetime.now()
+    # Save inbound email record (always, for audit trail)
+    inbound = InboundEmail(
+        from_email=email.from_email,
+        subject=email.subject,
+        body=email.body,
+        po_number=po_number,
+        load_id=load.id if load else None,
+        parsed_eta=parsed_eta,
+        parse_method=parse_method,
+        parse_success=success,
+        parse_message=message,
+        received_at=received_at,
+        processed_at=datetime.now(),
+    )
+    db.add(inbound)
 
-    # Note: Activity logging requires agent_id (not nullable), so we skip it for inbound emails
-    # This is a direct carrier response, not an agent action
+    # Log to activity stream
+    activity = Activity(
+        agent_id=None,
+        activity_type=ActivityType.EMAIL_RECEIVED,
+        load_id=load.id if load else None,
+        details={
+            "from_email": email.from_email,
+            "subject": email.subject,
+            "po_number": po_number,
+            "parsed_eta": parsed_eta.isoformat() if parsed_eta else None,
+            "parse_method": parse_method,
+            "parse_success": success,
+            "message": message,
+        },
+    )
+    db.add(activity)
     db.commit()
 
     return InboundEmailResponse(
-        success=True,
+        success=success,
         po_number=po_number,
         parsed_eta=parsed_eta,
-        message=f"ETA updated from {old_eta} to {parsed_eta.strftime('%Y-%m-%d %H:%M')}"
+        message=message,
     )
+
+
+@router.get("/inbound", response_model=List[InboundEmailOut])
+def get_inbound_emails(
+    limit: int = Query(default=50, le=200),
+    db: Session = Depends(get_db)
+):
+    """Get recent inbound carrier emails, newest first."""
+    emails = (
+        db.query(InboundEmail)
+        .order_by(InboundEmail.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return emails
 
 
 @router.post("/inbound/test", response_model=InboundEmailResponse)
@@ -104,7 +153,7 @@ def test_eta_parsing(email: InboundEmailRequest):
     """
     po_number = extract_po_number(email.subject, email.body)
     received_at = email.received_at or datetime.now()
-    parsed_eta = parse_eta_from_email(email.subject, email.body, received_at)
+    parsed_eta, _ = parse_eta_from_email_with_method(email.subject, email.body, received_at)
 
     if not po_number:
         return InboundEmailResponse(
