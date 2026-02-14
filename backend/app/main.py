@@ -32,6 +32,24 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("database_initialized")
 
+    # Auto-seed if database is empty (first deploy)
+    from app.database import SessionLocal
+    from app.models import Site
+    try:
+        db = SessionLocal()
+        if db.query(Site).count() == 0:
+            logger.info("empty_database_detected", action="auto_seeding")
+            db.close()
+            from seed_data import seed_database
+            seed_database()
+            from add_tracking_data import add_tracking_to_loads
+            add_tracking_to_loads()
+            logger.info("auto_seed_complete")
+        else:
+            db.close()
+    except Exception as e:
+        logger.warning("auto_seed_skipped", error=str(e))
+
     # Start agent scheduler
     from app.agents.agent_scheduler import start_scheduler, stop_scheduler
     start_scheduler()
