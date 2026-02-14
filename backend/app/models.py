@@ -400,6 +400,10 @@ class InboundEmail(Base):
     parse_success = Column(Boolean, default=False, nullable=False)
     parse_message = Column(String(500), nullable=True)  # Human-readable result
 
+    # Auto-reply tracking
+    auto_reply_sent = Column(Boolean, default=False, nullable=False)
+    auto_reply_type = Column(String(50), nullable=True)  # "eta_acknowledged" or "coordinator_escalation"
+
     # Timestamps
     received_at = Column(DateTime, nullable=True)
     processed_at = Column(DateTime, default=datetime.utcnow, nullable=False)

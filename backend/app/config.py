@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     gmail_app_password: str = ""  # Gmail app password (not regular password)
     gmail_enabled: bool = False  # Set to True to enable real email sending
 
+    # Coordinator
+    coordinator_email: str = ""  # CC address for escalation replies to carriers
+
     # Application
     debug: bool = True
     log_level: str = "INFO"

@@ -166,6 +166,7 @@ class GmailETAPoller:
             # Extract fields
             subject = self.decode_subject(msg.get("Subject", ""))
             from_email = msg.get("From", "")
+            message_id = msg.get("Message-ID", "")
             body = self.extract_body(msg)
 
             logger.info(f"Processing email: {subject[:50]}... from {from_email}")
@@ -181,13 +182,14 @@ class GmailETAPoller:
                 "subject": subject,
                 "body": body,
                 "from_email": from_email,
-                "received_at": datetime.now().isoformat()
+                "received_at": datetime.now().isoformat(),
+                "message_id": message_id or None,
             }
 
             logger.info(f"Calling API: {api_url}")
             logger.debug(f"Payload: {payload}")
 
-            response = requests.post(api_url, json=payload, timeout=10)
+            response = requests.post(api_url, json=payload, timeout=30)
             result = response.json()
 
             if result.get("success"):

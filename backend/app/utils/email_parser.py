@@ -118,28 +118,35 @@ _PARSE_PROMPT = """\
 You are an ETA extraction tool for a fuel logistics system.
 A carrier dispatcher replied to an ETA request email. Extract the delivery ETA from their reply.
 
+The email was received at: {received_at}
+
 Rules:
 - Return ONLY valid JSON, no markdown fences, no explanation.
 - If the email contains a specific time or time range, extract it.
 - For time ranges, use the LATER time (worst-case).
+- For RELATIVE time references like "couple hours", "in an hour", "about 2 hours", "30 minutes", calculate the actual time by adding the offset to the email received time shown above.
+- For example, if the email was received at 1:46 PM and says "next couple hours", return "1546" (1:46 PM + 2 hours). For "about an hour", add 1 hour. For "30 minutes", add 30 minutes. Always round UP for vague durations ("couple" = 2, "few" = 3).
 - Ignore times that are clearly part of phone numbers, PO numbers, addresses, or signatures.
-- If the response is vague (e.g. "running late", "delayed", "not sure", "don't know"), return status "vague".
+- Only return "vague" for truly unresolvable responses (e.g. "running late" with no timeframe, "delayed indefinitely", "not sure", "don't know").
 - If you cannot determine an ETA at all, return status "unknown".
 
 Return this JSON shape:
-{"status": "ok", "time_24h": "HHMM"}
+{{"status": "ok", "time_24h": "HHMM"}}
 or
-{"status": "vague", "reason": "brief reason"}
+{{"status": "vague", "reason": "brief reason"}}
 or
-{"status": "unknown"}
+{{"status": "unknown"}}
 
 Examples:
-- "ETA 0600" -> {"status": "ok", "time_24h": "0600"}
-- "Should arrive 4:30 PM" -> {"status": "ok", "time_24h": "1630"}
-- "between 1200 and 1400" -> {"status": "ok", "time_24h": "1400"}
-- "1-3 PM" -> {"status": "ok", "time_24h": "1500"}
-- "Running late, will update" -> {"status": "vague", "reason": "running late"}
-- "I don't know yet" -> {"status": "vague", "reason": "unknown eta"}
+- "ETA 0600" -> {{"status": "ok", "time_24h": "0600"}}
+- "Should arrive 4:30 PM" -> {{"status": "ok", "time_24h": "1630"}}
+- "between 1200 and 1400" -> {{"status": "ok", "time_24h": "1400"}}
+- "1-3 PM" -> {{"status": "ok", "time_24h": "1500"}}
+- "next couple hours" (received 1:46 PM) -> {{"status": "ok", "time_24h": "1546"}}
+- "about an hour" (received 10:00 AM) -> {{"status": "ok", "time_24h": "1100"}}
+- "30 minutes out" (received 3:15 PM) -> {{"status": "ok", "time_24h": "1545"}}
+- "Running late, will update" -> {{"status": "vague", "reason": "running late, no timeframe"}}
+- "I don't know yet" -> {{"status": "vague", "reason": "unknown eta"}}
 """
 
 def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[datetime]:
@@ -154,12 +161,13 @@ def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[da
         return None  # no key -> fall through to regex
 
     user_msg = f"Subject: {subject}\n\nBody:\n{body}"
+    system_prompt = _PARSE_PROMPT.format(received_at=sent_date.strftime("%Y-%m-%d %I:%M %p"))
 
     try:
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=128,
-            system=_PARSE_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
         )
 

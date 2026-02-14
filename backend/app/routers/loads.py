@@ -1,5 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 import json
@@ -10,6 +11,9 @@ from app.database import get_db
 from app.models import Load, LoadStatus, Site, Carrier, User
 from app.schemas import LoadCreate, LoadUpdate, LoadResponse, LoadWithDetails
 from app.auth import get_current_user
+from app.integrations.email_service import email_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/loads", tags=["loads"])
 
@@ -280,6 +284,106 @@ def add_note_to_load(
     db.commit()
     db.refresh(db_load)
     return db_load
+
+
+@router.post("/{load_id}/request-eta")
+def request_eta_for_load(
+    load_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send an ETA request email for a single load."""
+    load = db.query(Load).options(
+        joinedload(Load.carrier),
+        joinedload(Load.destination_site),
+    ).filter(Load.id == load_id).first()
+    if not load:
+        raise HTTPException(status_code=404, detail="Load not found")
+    if not load.carrier or not load.carrier.dispatcher_email:
+        raise HTTPException(status_code=400, detail="No dispatcher email for carrier")
+
+    site = load.destination_site
+    hours_to_runout = site.hours_to_runout if site else None
+
+    result = email_service.send_eta_request(
+        to_email=load.carrier.dispatcher_email,
+        carrier_name=load.carrier.carrier_name,
+        po_number=load.po_number,
+        site_name=site.consignee_name if site else "Unknown",
+        hours_to_runout=hours_to_runout,
+        driver_name=load.driver_name,
+    )
+
+    if result.get("success"):
+        load.last_email_sent = datetime.utcnow()
+        db.commit()
+
+    return {
+        "load_id": load.id,
+        "po_number": load.po_number,
+        "carrier": load.carrier.carrier_name,
+        "to_email": load.carrier.dispatcher_email,
+        "success": result.get("success", False),
+        "message": result.get("error") if not result.get("success") else "ETA request sent",
+    }
+
+
+@router.post("/request-eta-all")
+def request_eta_for_all_active_loads(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send ETA request emails for all active loads (scheduled + in transit)."""
+    loads = db.query(Load).options(
+        joinedload(Load.carrier),
+        joinedload(Load.destination_site),
+    ).filter(
+        Load.status.in_([LoadStatus.SCHEDULED, LoadStatus.IN_TRANSIT])
+    ).all()
+
+    results = []
+    sent_count = 0
+    for load in loads:
+        if not load.carrier or not load.carrier.dispatcher_email:
+            results.append({
+                "load_id": load.id,
+                "po_number": load.po_number,
+                "success": False,
+                "message": "No dispatcher email",
+            })
+            continue
+
+        site = load.destination_site
+        hours_to_runout = site.hours_to_runout if site else None
+
+        result = email_service.send_eta_request(
+            to_email=load.carrier.dispatcher_email,
+            carrier_name=load.carrier.carrier_name,
+            po_number=load.po_number,
+            site_name=site.consignee_name if site else "Unknown",
+            hours_to_runout=hours_to_runout,
+            driver_name=load.driver_name,
+        )
+
+        if result.get("success"):
+            load.last_email_sent = datetime.utcnow()
+            sent_count += 1
+
+        results.append({
+            "load_id": load.id,
+            "po_number": load.po_number,
+            "carrier": load.carrier.carrier_name,
+            "success": result.get("success", False),
+        })
+
+    db.commit()
+
+    return {
+        "total": len(loads),
+        "sent": sent_count,
+        "failed": len(loads) - sent_count,
+        "results": results,
+    }
 
 
 @router.delete("/{load_id}", status_code=204)

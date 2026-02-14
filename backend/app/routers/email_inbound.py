@@ -2,6 +2,7 @@
 API endpoints for processing inbound carrier email replies.
 """
 
+import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -9,8 +10,15 @@ from datetime import datetime
 from typing import Optional, List
 
 from app.database import get_db
-from app.models import Load, InboundEmail, Activity, ActivityType
+from app.models import (
+    Load, InboundEmail, Activity, ActivityType,
+    Escalation, IssueType, EscalationPriority,
+)
 from app.utils.email_parser import parse_eta_from_email_with_method, extract_po_number
+from app.integrations.email_service import email_service
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/email", tags=["email"])
 
@@ -21,6 +29,7 @@ class InboundEmailRequest(BaseModel):
     body: str
     from_email: str
     received_at: Optional[datetime] = None
+    message_id: Optional[str] = None  # Original email Message-ID for threading
 
 
 class InboundEmailResponse(BaseModel):
@@ -29,6 +38,8 @@ class InboundEmailResponse(BaseModel):
     po_number: Optional[str] = None
     parsed_eta: Optional[datetime] = None
     message: str
+    auto_reply_sent: bool = False
+    auto_reply_type: Optional[str] = None
 
 
 class InboundEmailOut(BaseModel):
@@ -42,6 +53,8 @@ class InboundEmailOut(BaseModel):
     parse_method: Optional[str] = None
     parse_success: bool
     parse_message: Optional[str] = None
+    auto_reply_sent: bool = False
+    auto_reply_type: Optional[str] = None
     received_at: Optional[datetime] = None
     processed_at: datetime
 
@@ -57,8 +70,10 @@ def process_inbound_email(
     """
     Process inbound carrier email reply and update load ETA.
     Saves every inbound email for audit trail regardless of parse outcome.
+    Sends auto-reply: thank-you for good ETAs, escalation for vague ones.
     """
     received_at = email.received_at or datetime.now()
+    settings = get_settings()
 
     # Extract PO number from subject or body
     po_number = extract_po_number(email.subject, email.body)
@@ -122,11 +137,104 @@ def process_inbound_email(
     db.add(activity)
     db.commit()
 
+    # --- Auto-reply to carrier ---
+    auto_reply_type = None
+    reply_result = None
+
+    # Loop guard: never reply to ourselves
+    is_self = email.from_email.lower().strip() == settings.gmail_user.lower().strip()
+
+    if is_self:
+        logger.info(f"Skipping auto-reply: sender is self ({email.from_email})")
+    elif success:
+        # Case A: Good ETA — send thank-you
+        reply_body = (
+            f"Thank you for the update on PO #{po_number}.\n\n"
+            f"We have recorded the ETA as {parsed_eta.strftime('%B %d, %Y at %I:%M %p')}.\n\n"
+            f"If anything changes, please reply to this thread.\n\n"
+            f"Best regards,\n"
+            f"Fuels Logistics AI Coordinator"
+        )
+        reply_result = email_service.send_reply(
+            to_email=email.from_email,
+            subject=email.subject,
+            body=reply_body,
+            original_message_id=email.message_id,
+        )
+        auto_reply_type = "eta_acknowledged"
+
+    elif load is not None and not parsed_eta:
+        # Case B: Load found but vague/no ETA — escalate to coordinator
+        coordinator_cc = settings.coordinator_email or None
+        if not coordinator_cc:
+            logger.warning("No COORDINATOR_EMAIL configured — escalation reply sent without CC")
+
+        reply_body = (
+            f"Thank you for your reply regarding PO #{po_number}.\n\n"
+            f"We were unable to determine a specific ETA from your message. "
+            f"A coordinator has been copied on this email and will follow up with you directly.\n\n"
+            f"If you have an updated ETA, please reply with a specific time "
+            f"(e.g., '3:30 PM' or '1530').\n\n"
+            f"Best regards,\n"
+            f"Fuels Logistics AI Coordinator"
+        )
+        reply_result = email_service.send_reply(
+            to_email=email.from_email,
+            subject=email.subject,
+            body=reply_body,
+            original_message_id=email.message_id,
+            cc=coordinator_cc,
+        )
+        auto_reply_type = "coordinator_escalation"
+
+        # Create escalation for the coordinator dashboard
+        escalation = Escalation(
+            issue_type=IssueType.NO_CARRIER_RESPONSE,
+            priority=EscalationPriority.MEDIUM,
+            description=(
+                f"Carrier reply for {po_number} could not be parsed into a specific ETA. "
+                f"From: {email.from_email}. "
+                f"Message: \"{email.body[:200]}{'...' if len(email.body) > 200 else ''}\""
+            ),
+            load_id=load.id,
+            site_id=load.destination_site_id,
+            assigned_to=settings.coordinator_email or None,
+        )
+        db.add(escalation)
+
+    # Update inbound email record with auto-reply status
+    if auto_reply_type:
+        inbound.auto_reply_sent = True
+        inbound.auto_reply_type = auto_reply_type
+
+        # Log auto-reply activity
+        reply_subject = email.subject
+        if not reply_subject.lower().startswith("re:"):
+            reply_subject = f"Re: {reply_subject}"
+
+        reply_activity = Activity(
+            agent_id=None,
+            activity_type=ActivityType.EMAIL_SENT,
+            load_id=load.id if load else None,
+            details={
+                "to": email.from_email,
+                "cc": settings.coordinator_email if auto_reply_type == "coordinator_escalation" else None,
+                "subject": reply_subject,
+                "po_number": po_number,
+                "auto_reply_type": auto_reply_type,
+                "success": reply_result.get("success", False) if reply_result else False,
+            },
+        )
+        db.add(reply_activity)
+        db.commit()
+
     return InboundEmailResponse(
         success=success,
         po_number=po_number,
         parsed_eta=parsed_eta,
         message=message,
+        auto_reply_sent=auto_reply_type is not None,
+        auto_reply_type=auto_reply_type,
     )
 
 

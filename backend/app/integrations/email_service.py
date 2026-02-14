@@ -31,21 +31,21 @@ class EmailService:
         self,
         to_email: str,
         subject: str,
-        body: str
+        body: str,
+        cc: Optional[str] = None,
+        in_reply_to: Optional[str] = None,
+        references: Optional[str] = None,
     ) -> dict:
         """
         Send email via Gmail SMTP.
 
-        Requires:
-        - GMAIL_USER environment variable (your Gmail address)
-        - GMAIL_APP_PASSWORD environment variable (Gmail app password)
-        - GMAIL_ENABLED=true
-
-        To get an app password:
-        1. Enable 2FA on your Google account
-        2. Go to https://myaccount.google.com/apppasswords
-        3. Generate a new app password for "Mail"
-        4. Use that 16-character password (not your regular password)
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            body: Email body text
+            cc: Optional CC address
+            in_reply_to: Optional Message-ID for threading
+            references: Optional References header for threading
         """
         if not self.gmail_user or not self.gmail_app_password:
             raise ValueError("Gmail credentials not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.")
@@ -57,6 +57,13 @@ class EmailService:
             msg['To'] = to_email
             msg['Subject'] = subject
 
+            if cc:
+                msg['Cc'] = cc
+            if in_reply_to:
+                msg['In-Reply-To'] = in_reply_to
+            if references:
+                msg['References'] = references
+
             # Add body
             text_part = MIMEText(body, 'plain')
             msg.attach(text_part)
@@ -66,7 +73,7 @@ class EmailService:
                 server.login(self.gmail_user, self.gmail_app_password)
                 server.send_message(msg)
 
-            logger.info(f"[GMAIL SENT] To: {to_email} | Subject: {subject}")
+            logger.info(f"[GMAIL SENT] To: {to_email}{f' CC: {cc}' if cc else ''} | Subject: {subject}")
 
             return {
                 "success": True,
@@ -213,6 +220,55 @@ Fuels Logistics AI Coordinator"""
             db.close()
         except Exception as e:
             logger.warning(f"Failed to log email activity: {e}")
+
+        return result
+
+    def send_reply(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        original_message_id: Optional[str] = None,
+        cc: Optional[str] = None,
+    ) -> dict:
+        """
+        Send a reply email, optionally threading with the original message.
+
+        Args:
+            to_email: Recipient (original sender)
+            subject: Original subject (Re: prefix added if missing)
+            body: Reply body text
+            original_message_id: Message-ID of the email being replied to
+            cc: Optional CC address (e.g. coordinator)
+        """
+        # Ensure "Re:" prefix
+        if not subject.lower().startswith("re:"):
+            subject = f"Re: {subject}"
+
+        if self.gmail_enabled:
+            result = self._send_via_gmail_smtp(
+                to_email, subject, body,
+                cc=cc,
+                in_reply_to=original_message_id,
+                references=original_message_id,
+            )
+        else:
+            result = self._send_mock(
+                to_email, subject, body,
+                po_number="", carrier_name="", site_name=""
+            )
+
+        # Store in history
+        self.sent_emails.append({
+            "to": to_email,
+            "cc": cc,
+            "subject": subject,
+            "body": body,
+            "sent_at": result.get("sent_at", datetime.utcnow().isoformat()),
+            "success": result.get("success", False),
+            "method": result.get("method", "unknown"),
+            "type": "auto_reply",
+        })
 
         return result
 

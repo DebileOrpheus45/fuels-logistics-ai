@@ -96,6 +96,8 @@ export const addNoteToLoad = (loadId, noteText, author, noteType = 'human') =>
   api.post(`/loads/${loadId}/notes`, null, {
     params: { note_text: noteText, author, note_type: noteType }
   }).then(res => res.data)
+export const requestEtaForLoad = (loadId) => api.post(`/loads/${loadId}/request-eta`).then(res => res.data)
+export const requestEtaForAllLoads = () => api.post('/loads/request-eta-all').then(res => res.data)
 
 // Carriers
 export const getCarriers = () => api.get('/carriers/').then(res => res.data)
