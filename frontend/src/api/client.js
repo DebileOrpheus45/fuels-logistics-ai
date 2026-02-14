@@ -24,6 +24,19 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Auto-redirect to login on 401
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
+      window.location.reload()
+    }
+    return Promise.reject(error)
+  }
+)
+
 // Auth functions
 export const login = async (username, password) => {
   const formData = new URLSearchParams()

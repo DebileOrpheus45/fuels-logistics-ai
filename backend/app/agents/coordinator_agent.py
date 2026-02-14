@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import (
-    Site, Load, Carrier, AIAgent, Activity, Escalation,
-    LoadStatus, AgentStatus, ActivityType, IssueType, EscalationPriority, AgentExecutionMode
+    Site, Load, Carrier, AIAgent, Activity, Escalation, AgentRunHistory,
+    LoadStatus, AgentStatus, ActivityType, IssueType, EscalationPriority,
+    AgentExecutionMode, AgentRunStatus
 )
 from app.integrations.claude_service import claude_service
 from app.services.email_service import send_eta_request
@@ -527,6 +528,82 @@ class CoordinatorAgent:
 
 
 def run_agent_check(agent_id: int) -> Dict[str, Any]:
-    """Run a single check cycle for an agent."""
-    agent = CoordinatorAgent(agent_id)
-    return agent.run_check_cycle()
+    """Run a single check cycle for an agent, recording run history."""
+    db = SessionLocal()
+    started_at = datetime.utcnow()
+
+    try:
+        # Get agent info for the run record
+        db_agent = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
+        execution_mode = db_agent.execution_mode if db_agent else AgentExecutionMode.DRAFT_ONLY
+
+        # Count sites and loads for this agent
+        sites_count = db.query(Site).filter(Site.assigned_agent_id == agent_id).count()
+        site_ids = [s.id for s in db.query(Site.id).filter(Site.assigned_agent_id == agent_id).all()]
+        loads_count = db.query(Load).filter(
+            Load.destination_site_id.in_(site_ids),
+            Load.status.in_([LoadStatus.SCHEDULED, LoadStatus.IN_TRANSIT, LoadStatus.DELAYED])
+        ).count() if site_ids else 0
+
+        # Create run history record
+        run_record = AgentRunHistory(
+            agent_id=agent_id,
+            started_at=started_at,
+            status=AgentRunStatus.RUNNING,
+            execution_mode=execution_mode,
+            sites_checked=sites_count,
+            loads_checked=loads_count,
+        )
+        db.add(run_record)
+        db.commit()
+        db.refresh(run_record)
+        db.close()
+
+        # Run the actual check
+        agent = CoordinatorAgent(agent_id)
+        result = agent.run_check_cycle()
+
+        # Update run record with results
+        db = SessionLocal()
+        run_record = db.query(AgentRunHistory).filter(AgentRunHistory.id == run_record.id).first()
+        completed_at = datetime.utcnow()
+        run_record.completed_at = completed_at
+        run_record.duration_seconds = (completed_at - started_at).total_seconds()
+        run_record.api_calls = result.get("iterations", 0)
+
+        if result.get("success"):
+            run_record.status = AgentRunStatus.COMPLETED
+            actions = result.get("actions_taken", [])
+            run_record.emails_sent = sum(1 for a in actions if a["type"] == "email_sent")
+            run_record.escalations_created = sum(1 for a in actions if a["type"] == "escalation_created")
+            run_record.decisions = [
+                {"type": a["type"], "summary": str(a.get("details", {}).get("description", a.get("details", {}))[:120])}
+                for a in actions
+            ]
+        else:
+            run_record.status = AgentRunStatus.FAILED
+            run_record.error_message = result.get("error", "Unknown error")
+
+        db.commit()
+        db.close()
+
+        return result
+
+    except Exception as e:
+        # Mark as failed if something went wrong
+        try:
+            db = SessionLocal()
+            run_record = db.query(AgentRunHistory).filter(
+                AgentRunHistory.agent_id == agent_id,
+                AgentRunHistory.started_at == started_at
+            ).first()
+            if run_record:
+                run_record.status = AgentRunStatus.FAILED
+                run_record.completed_at = datetime.utcnow()
+                run_record.duration_seconds = (datetime.utcnow() - started_at).total_seconds()
+                run_record.error_message = str(e)
+                db.commit()
+            db.close()
+        except Exception:
+            pass
+        raise

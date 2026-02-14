@@ -159,6 +159,7 @@ fuels-logistics-ai/
 │   ├── .env.example             # Environment variable template
 │   └── package.json
 ├── docker-compose.yml
+├── start_all.ps1               # One-command startup (backend + poller + frontend)
 ├── ARCHITECTURE.md
 ├── GMAIL-SETUP.md
 └── INGESTION-ROADMAP.md
@@ -168,16 +169,22 @@ fuels-logistics-ai/
 
 ## Key Workflows
 
-### Starting the System
+### Starting the System (One Command)
+```powershell
+powershell -File start_all.ps1
+```
+This starts backend (port 8000), email poller, and frontend (port 5173) together. Press `Ctrl+C` to stop all.
+
+**Manual start (alternative):**
 1. Start Docker database: `docker-compose up -d`
 2. Start backend: `cd backend && uvicorn app.main:app --reload`
-3. Start frontend: `cd frontend && npm run dev` (or `cd MGClone_v1 && npm run dev`)
-4. Access dashboard in browser
+3. Start email poller: `cd backend && python start_email_poller.py`
+4. Start frontend: `cd frontend && npm run dev`
+5. Access dashboard at http://localhost:5173
 
 ### Stopping the System
-1. Press `Ctrl+C` in frontend terminal(s)
-2. Press `Ctrl+C` in backend terminal
-3. Stop database: `docker-compose down`
+1. Press `Ctrl+C` in the `start_all.ps1` terminal (stops all services)
+2. Or manually stop each process + `docker-compose down`
 
 ### Resetting Database
 ```bash
@@ -194,14 +201,23 @@ python seed_data.py
 ### How It Works
 - AI agents monitor assigned sites every 15 minutes (configurable)
 - Agents analyze inventory levels, runout times, and active loads
-- Agents can send ETA requests (mocked in MVP) and create escalations
-- All actions are logged to the Activity table
+- Agents send real ETA request emails via Gmail SMTP to carriers
+- Creates escalations for critical inventory situations
+- All actions logged to Activity table + Run History with full decision audit trail
 - Human coordinators supervise via the HITL dashboard
+- Inbound carrier ETA replies are auto-parsed (LLM + regex) and update load ETAs
 
 ### Agent Tools
-- `send_eta_request_email` - Request delivery updates from carriers
+- `send_eta_request_email` - Send real ETA request emails to carrier dispatchers
 - `create_escalation` - Flag critical issues for human attention
 - `update_dashboard_note` - Add notes to site records
+
+### Run History & Decision Audit
+Each agent run records:
+- Duration, sites checked, loads analyzed, API calls made
+- Emails sent and escalations created
+- Individual decisions with type badges and summaries
+- Clickable/expandable rows in the Agent Monitor UI
 
 ---
 
@@ -228,9 +244,19 @@ For questions or issues:
 
 ## Recent Updates (February 2026)
 
+**Week 7 - Email Automation & Agent Audit Trail:**
+- ✅ **Real Gmail ETA Emails** - Agent sends actual ETA request emails via Gmail SMTP to carriers
+- ✅ **Auto-Reply Processing** - Inbound carrier replies parsed by LLM (Claude Haiku) with regex fallback; ETAs auto-updated on loads
+- ✅ **Relative Time Parsing** - "couple hours", "30 minutes out" resolved against email received time
+- ✅ **Agent Run History Recording** - Every run creates an audit record with decisions, emails sent, escalations created
+- ✅ **Expandable Run History UI** - Click any run to see decision cards with type badges and summaries
+- ✅ **Load Notes** - Add timestamped notes to loads (persisted to Postgres JSON column)
+- ✅ **One-Command Startup** - `start_all.ps1` launches backend + email poller + frontend together
+- ✅ **401 Auto-Redirect** - Expired tokens auto-redirect to login
+
 **Week 6 - Production Observability:**
 - ✅ **Structured JSON Logging** - Production-ready logging with structlog
-- ✅ **Agent Run History** - Track execution metrics (duration, sites checked, emails sent, API calls, tokens used)
+- ✅ **Agent Run History Model** - Track execution metrics (duration, sites checked, emails sent, API calls, tokens used)
 - ✅ **Agent Monitor UI** - Real-time run history panel with collapsible metrics view
 - ✅ **CSV Export** - Download run history data for analysis
 
@@ -253,5 +279,5 @@ See [INGESTION-ROADMAP.md](INGESTION-ROADMAP.md) for email automation roadmap.
 
 ---
 
-**Version:** 0.4.0 (Production Ready)
-**Last Updated:** February 6, 2026
+**Version:** 0.5.0 (Email Automation + Agent Audit Trail)
+**Last Updated:** February 14, 2026
