@@ -141,6 +141,11 @@ export const resolveEscalation = (id, notes) =>
 export const getSentEmails = () => api.get('/emails/sent').then(res => res.data)
 export const getInboundEmails = () => api.get('/email/inbound').then(res => res.data)
 
+// Intelligence / Knowledge Graph
+export const getIntelligence = () => api.get('/intelligence/').then(res => res.data)
+export const refreshKnowledgeGraph = () => api.post('/intelligence/refresh').then(res => res.data)
+export const getStatusSummary = () => api.get('/intelligence/status-summary').then(res => res.data)
+
 // Google Sheets
 export const getSheetsStatus = () => api.get('/sheets/status').then(res => res.data)
 export const syncToSheets = (spreadsheetUrl, sites, loads) =>

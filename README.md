@@ -61,31 +61,17 @@ python start_email_poller.py
 
 ## Documentation
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture documentation
-  - System architecture diagrams
-  - Database schema
-  - API endpoints
-  - AI agent system details
-
-- **[LOAD-TRACKING.md](LOAD-TRACKING.md)** - Interactive load tracking guide
-  - GPS route visualization
-  - Load details sidebar
-  - Table sorting and search
-  - Customer tagging
-
-- **[GMAIL-SETUP.md](GMAIL-SETUP.md)** - Gmail SMTP integration guide
-  - 5-minute setup for sending emails
-  - App password generation
-  - Environment configuration
-
-- **[backend/EMAIL_POLLER_SETUP.md](backend/EMAIL_POLLER_SETUP.md)** - Gmail IMAP polling guide
-  - Automated carrier ETA reply processing
-  - Email parser capabilities
-  - Troubleshooting IMAP connection issues
-
-- **[INGESTION-ROADMAP.md](INGESTION-ROADMAP.md)** - Email automation roadmap
-  - Current email parsing features
-  - Future automation plans
+| Doc | Purpose |
+|-----|---------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, DB schema, API endpoints, AI agent design |
+| [USER-GUIDE.md](USER-GUIDE.md) | Non-technical user manual (startup, workflows, troubleshooting) |
+| [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | Completed/current/future phases |
+| [ENTERPRISE-READINESS-ROADMAP.md](ENTERPRISE-READINESS-ROADMAP.md) | Production deployment plan (0.4 → 1.0) |
+| [LOAD-TRACKING.md](LOAD-TRACKING.md) | GPS routes, load sidebar, sorting, customer tagging |
+| [GMAIL-SETUP.md](GMAIL-SETUP.md) | Gmail SMTP setup for sending ETA emails |
+| [backend/EMAIL_POLLER_SETUP.md](backend/EMAIL_POLLER_SETUP.md) | Gmail IMAP polling for auto-parsing carrier replies |
+| [backend/AUTH-SETUP.md](backend/AUTH-SETUP.md) | JWT authentication, RBAC roles, token management |
+| [INGESTION-ROADMAP.md](INGESTION-ROADMAP.md) | Email automation: completed and planned channels |
 
 ---
 
@@ -104,7 +90,14 @@ python start_email_poller.py
 - ✅ Site-specific notes and constraints
 - ✅ Staleness detection and overnight-aware escalations
 
-### Production Features (New)
+### Intelligence & Automation
+- ✅ Tiered agent architecture (Tier 1 rules engine $0/run + Tier 2 LLM on-demand)
+- ✅ Knowledge graph: carrier reliability scoring, site risk profiles
+- ✅ Auto-escalation of non-ETA emails (shortages, breakdowns, cancellations)
+- ✅ Executive status summary generator (Agent Monitor)
+- ✅ System Logic page with decision architecture explainer
+
+### Production Features
 - ✅ JWT authentication with real login flow
 - ✅ Agent execution modes (Draft Only / Auto Email / Full Auto)
 - ✅ Structured JSON logging with structlog
@@ -233,16 +226,16 @@ Proprietary - All rights reserved
 
 ---
 
-## Support
-
-For questions or issues:
-- See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
-- See [LOAD-TRACKING.md](LOAD-TRACKING.md) for GPS tracking features
-- See [backend/EMAIL_POLLER_SETUP.md](backend/EMAIL_POLLER_SETUP.md) for email automation
-
----
-
 ## Recent Updates (February 2026)
+
+**Week 8 - Tiered Agent Intelligence:**
+- ✅ **Tier 1 Rules Engine** - Zero-token threshold checks handle ~90% of routine monitoring (runout detection, stale ETAs, delayed loads)
+- ✅ **Tier 2 LLM Agent** - Claude fires only on ambiguous situations flagged by Tier 1 (unreliable carriers, multi-site risk)
+- ✅ **Knowledge Graph** - Passive SQL-based intelligence: carrier reliability scores, site false alarm rates, risk profiles
+- ✅ **Auto-Escalation** - Non-ETA carrier emails (shortages, breakdowns, cancellations) auto-detected and escalated
+- ✅ **System Logic Page** - Decision architecture explainer with live knowledge graph data
+- ✅ **Executive Summary** - One-click status update on Agent Monitor from live data + knowledge graph
+- ✅ **Escalation Filtering** - Open/Resolved toggle on Escalations page
 
 **Week 7 - Email Automation & Agent Audit Trail:**
 - ✅ **Real Gmail ETA Emails** - Agent sends actual ETA request emails via Gmail SMTP to carriers
@@ -275,9 +268,7 @@ For questions or issues:
 - ✅ **Staleness Detection** - Automated monitoring of data freshness
 - ✅ **Overnight-Aware Escalations** - Time-based urgency logic
 
-See [INGESTION-ROADMAP.md](INGESTION-ROADMAP.md) for email automation roadmap.
-
 ---
 
-**Version:** 0.5.0 (Email Automation + Agent Audit Trail)
+**Version:** 0.6.0 (Tiered Agent Intelligence + Knowledge Graph)
 **Last Updated:** February 14, 2026

@@ -103,6 +103,30 @@ def process_inbound_email(
         load.last_eta_update_at = datetime.now()
         message = f"ETA updated from {old_eta} to {parsed_eta.strftime('%Y-%m-%d %H:%M')}"
 
+    # ── Knowledge Graph Updates ──
+    from app.services.knowledge_graph import on_eta_email_response, on_unparseable_email
+
+    if success and load:
+        # Carrier responded with valid ETA — update responsiveness
+        try:
+            on_eta_email_response(load.carrier_id, request_sent_at=load.last_email_sent)
+        except Exception as kg_err:
+            logger.warning(f"Knowledge graph update failed: {kg_err}")
+
+    elif load and not parsed_eta:
+        # Unparseable — check for important non-ETA content
+        try:
+            kg_result = on_unparseable_email(
+                from_email=email.from_email,
+                subject=email.subject,
+                body=email.body,
+                load_id=load.id
+            )
+            if kg_result.get("escalated"):
+                message += f" (auto-escalated: {kg_result.get('issue_type')})"
+        except Exception as kg_err:
+            logger.warning(f"Knowledge graph unparseable check failed: {kg_err}")
+
     # Save inbound email record (always, for audit trail)
     inbound = InboundEmail(
         from_email=email.from_email,

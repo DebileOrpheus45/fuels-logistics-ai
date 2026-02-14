@@ -413,6 +413,74 @@ class InboundEmail(Base):
     load = relationship("Load", back_populates="inbound_emails")
 
 
+class CarrierStats(Base):
+    """Knowledge graph: carrier reliability and performance metrics."""
+    __tablename__ = "carrier_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    carrier_id = Column(Integer, ForeignKey("carriers.id"), unique=True, nullable=False, index=True)
+
+    # Delivery reliability
+    total_deliveries = Column(Integer, default=0)
+    late_deliveries = Column(Integer, default=0)
+    on_time_deliveries = Column(Integer, default=0)
+    avg_delay_hours = Column(Float, default=0.0)  # Average hours late (when late)
+    worst_delay_hours = Column(Float, default=0.0)
+
+    # Email responsiveness
+    total_eta_requests = Column(Integer, default=0)
+    eta_responses_received = Column(Integer, default=0)
+    avg_response_time_hours = Column(Float, nullable=True)  # How fast they reply
+    no_response_count = Column(Integer, default=0)
+
+    # Recent trend (last 10 deliveries as JSON)
+    recent_deliveries = Column(JSON, default=list)  # [{on_time: bool, delay_hours: float, date: str}]
+
+    # Flags
+    reliability_score = Column(Float, default=0.5)  # 0-1, computed from stats
+    flagged_unreliable = Column(Boolean, default=False)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    carrier = relationship("Carrier", backref="stats")
+
+
+class SiteStats(Base):
+    """Knowledge graph: site consumption patterns and escalation history."""
+    __tablename__ = "site_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    site_id = Column(Integer, ForeignKey("sites.id"), unique=True, nullable=False, index=True)
+
+    # Consumption patterns
+    avg_daily_consumption = Column(Float, nullable=True)  # gallons/day
+    peak_daily_consumption = Column(Float, nullable=True)
+    typical_low_day = Column(String(20), nullable=True)  # e.g., "Friday"
+
+    # Escalation history
+    total_escalations = Column(Integer, default=0)
+    false_alarm_count = Column(Integer, default=0)  # Escalations that resolved without action
+    false_alarm_rate = Column(Float, default=0.0)  # false_alarm_count / total_escalations
+
+    # Delivery patterns
+    total_deliveries_received = Column(Integer, default=0)
+    avg_days_between_deliveries = Column(Float, nullable=True)
+
+    # Risk profile
+    times_below_threshold = Column(Integer, default=0)
+    times_actually_ran_out = Column(Integer, default=0)  # True runouts
+    risk_score = Column(Float, default=0.5)  # 0-1, higher = more at risk
+
+    # Recent history (last 10 events as JSON)
+    recent_events = Column(JSON, default=list)  # [{type: "delivery"|"escalation"|"runout", date: str, details: str}]
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    site = relationship("Site", backref="stats")
+
+
 class AgentRunStatus(str, enum.Enum):
     RUNNING = "running"
     COMPLETED = "completed"

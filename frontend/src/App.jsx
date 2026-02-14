@@ -8,6 +8,7 @@ import {
   getSites,
   getActiveLoads,
   getOpenEscalations,
+  getEscalations,
   getAgents,
   updateAgent,
   runAgentCheck,
@@ -31,7 +32,10 @@ import {
   getStoredUser,
   isAuthenticated,
   syncToSheets,
-  getSheetsStatus
+  getSheetsStatus,
+  getIntelligence,
+  refreshKnowledgeGraph,
+  getStatusSummary
 } from './api/client'
 import {
   Fuel,
@@ -79,7 +83,12 @@ import {
   ArrowUpDown,
   Search,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Brain,
+  Shield,
+  TrendingUp,
+  Target,
+  Layers
 } from 'lucide-react'
 
 // ============== Login Page ==============
@@ -440,37 +449,62 @@ function EscalationModal({ escalation, onClose, onResolve }) {
             </div>
             <div>
               <span className="text-gray-500">Status:</span>
-              <p className="font-medium capitalize">{escalation.status}</p>
+              <p className={`font-medium capitalize ${escalation.status === 'resolved' ? 'text-green-600' : ''}`}>{escalation.status}</p>
             </div>
+            {escalation.status === 'resolved' && escalation.resolved_at && (
+              <div>
+                <span className="text-gray-500">Resolved:</span>
+                <p className="font-medium">{new Date(escalation.resolved_at).toLocaleString()}</p>
+              </div>
+            )}
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Resolution Notes
-            </label>
-            <textarea
-              className="w-full border rounded-lg p-2 text-sm"
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Enter notes about how this was resolved..."
-            />
-          </div>
+          {escalation.status === 'resolved' ? (
+            <>
+              {escalation.resolution_notes && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <h3 className="text-sm font-medium text-green-800 mb-1">Resolution Notes</h3>
+                  <p className="text-sm text-green-700">{escalation.resolution_notes}</p>
+                </div>
+              )}
+              <button
+                onClick={onClose}
+                className="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Resolution Notes
+                </label>
+                <textarea
+                  className="w-full border rounded-lg p-2 text-sm"
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter notes about how this was resolved..."
+                />
+              </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => onResolve(escalation.id, notes)}
-              className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-            >
-              Mark as Resolved
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => onResolve(escalation.id, notes)}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                >
+                  Mark as Resolved
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1362,6 +1396,12 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   const [activityFilter, setActivityFilter] = useState('all')
   const [showRunHistory, setShowRunHistory] = useState(true)
   const [expandedRunId, setExpandedRunId] = useState(null)
+  const [statusSummary, setStatusSummary] = useState(null)
+
+  const statusSummaryMutation = useMutation({
+    mutationFn: getStatusSummary,
+    onSuccess: (data) => setStatusSummary(data.summary)
+  })
 
   // Fetch run history for all agents
   const { data: runHistory, isLoading: runHistoryLoading } = useQuery({
@@ -1520,6 +1560,34 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
             </div>
           )
         })}
+      </div>
+
+      {/* Status Update */}
+      <div className="bg-white rounded-lg border border-slate-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-slate-600" />
+            <h3 className="text-sm font-semibold text-slate-800">Executive Summary</h3>
+          </div>
+          <button
+            onClick={() => statusSummaryMutation.mutate()}
+            disabled={statusSummaryMutation.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 transition"
+          >
+            {statusSummaryMutation.isPending ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="h-3.5 w-3.5" />
+            )}
+            Generate Update
+          </button>
+        </div>
+        {statusSummary && (
+          <div className="mt-3 bg-slate-50 rounded-lg p-4 border border-slate-100">
+            <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{statusSummary}</pre>
+            <div className="mt-2 text-[11px] text-slate-400 text-right">Generated from live data + knowledge graph</div>
+          </div>
+        )}
       </div>
 
       {/* Run History Panel */}
@@ -3017,6 +3085,7 @@ function StatsCard({ title, value, icon: Icon, color = 'blue', onClick, clickabl
 function Dashboard({ user, onLogout }) {
   const queryClient = useQueryClient()
   const [selectedEscalation, setSelectedEscalation] = useState(null)
+  const [escalationFilter, setEscalationFilter] = useState('open')
   const [selectedEmail, setSelectedEmail] = useState(null)
   const [selectedLoad, setSelectedLoad] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -3051,10 +3120,21 @@ function Dashboard({ user, onLogout }) {
     staleTime: 10000
   })
 
-  const { data: escalations, isFetching: isEscalationsFetching } = useQuery({
+  const { data: openEscalations, isFetching: isEscalationsFetching } = useQuery({
     queryKey: ['open-escalations'],
     queryFn: getOpenEscalations
   })
+
+  const { data: allEscalations } = useQuery({
+    queryKey: ['all-escalations'],
+    queryFn: getEscalations,
+    enabled: escalationFilter === 'resolved'
+  })
+
+  const escalations = escalationFilter === 'open' ? openEscalations : allEscalations
+  const displayedEscalations = escalationFilter === 'resolved'
+    ? escalations?.filter(e => e.status === 'resolved')
+    : escalations
 
   const { data: agents, isFetching: isAgentsFetching } = useQuery({
     queryKey: ['agents'],
@@ -3072,11 +3152,25 @@ function Dashboard({ user, onLogout }) {
     refetchInterval: 30000,
   })
 
+  const { data: intelligenceData } = useQuery({
+    queryKey: ['intelligence'],
+    queryFn: getIntelligence,
+    enabled: activeTab === 'intelligence',
+  })
+
   const resolveMutation = useMutation({
     mutationFn: ({ id, notes }) => resolveEscalation(id, notes),
     onSuccess: () => {
       queryClient.invalidateQueries(['open-escalations'])
+      queryClient.invalidateQueries(['all-escalations'])
       setSelectedEscalation(null)
+    }
+  })
+
+  const refreshKgMutation = useMutation({
+    mutationFn: refreshKnowledgeGraph,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['intelligence'])
     }
   })
 
@@ -3149,7 +3243,7 @@ function Dashboard({ user, onLogout }) {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-slate-900 rounded-lg">
@@ -3162,14 +3256,14 @@ function Dashboard({ user, onLogout }) {
             </div>
 
             <div className="flex items-center gap-3">
-              {escalations?.length > 0 && (
+              {openEscalations?.length > 0 && (
                 <button
-                  onClick={() => setActiveTab('escalations')}
+                  onClick={() => { setEscalationFilter('open'); setActiveTab('escalations') }}
                   className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
                 >
                   <Bell className="h-5 w-5" />
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {escalations.length}
+                    {openEscalations.length}
                   </span>
                 </button>
               )}
@@ -3203,7 +3297,7 @@ function Dashboard({ user, onLogout }) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <main className="mx-auto px-4 py-6">
         {/* Error Banner */}
         {(statsError || loadsError || sitesError) && (
           <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-lg">
@@ -3229,8 +3323,8 @@ function Dashboard({ user, onLogout }) {
 
         {/* Escalation Banner */}
         <EscalationBanner
-          escalations={escalations}
-          onViewAll={() => setActiveTab('escalations')}
+          escalations={openEscalations}
+          onViewAll={() => { setEscalationFilter('open'); setActiveTab('escalations') }}
         />
 
         {/* Stats Cards Row */}
@@ -3249,7 +3343,7 @@ function Dashboard({ user, onLogout }) {
             icon={Bell}
             color={stats?.open_escalations > 0 ? 'red' : 'green'}
             clickable
-            onClick={() => setActiveTab('escalations')}
+            onClick={() => { setEscalationFilter('open'); setActiveTab('escalations') }}
           />
           <StatsCard
             title="Delayed Loads"
@@ -3294,6 +3388,7 @@ function Dashboard({ user, onLogout }) {
                 { id: 'loads', label: 'Loads', icon: Truck },
                 { id: 'agent-monitor', label: 'Agent Monitor', icon: Bot },
                 { id: 'escalations', label: 'Escalations', icon: Bell },
+                { id: 'intelligence', label: 'System Logic', icon: Brain },
                 { id: 'sheets', label: 'Google Sheets', icon: FileSpreadsheet }
               ].map(({ id, label, icon: TabIcon }) => (
                 <button
@@ -3460,19 +3555,48 @@ function Dashboard({ user, onLogout }) {
         {/* Escalations Tab */}
         {activeTab === 'escalations' && (
           <div>
-            <h2 className="text-xl font-bold mb-4">Escalation Center</h2>
-            {escalations?.length === 0 ? (
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Escalation Center</h2>
+              <div className="flex bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setEscalationFilter('open')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
+                    escalationFilter === 'open'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Open{openEscalations?.length ? ` (${openEscalations.length})` : ''}
+                </button>
+                <button
+                  onClick={() => setEscalationFilter('resolved')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
+                    escalationFilter === 'resolved'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Resolved
+                </button>
+              </div>
+            </div>
+            {displayedEscalations?.length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                <p className="text-gray-500">No open escalations. All systems normal!</p>
+                <p className="text-gray-500">
+                  {escalationFilter === 'open'
+                    ? 'No open escalations. All systems normal!'
+                    : 'No resolved escalations yet.'}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {escalations?.map((esc) => (
+                {displayedEscalations?.map((esc) => (
                   <div
                     key={esc.id}
                     onClick={() => setSelectedEscalation(esc)}
                     className={`p-4 rounded-xl border-l-4 cursor-pointer transition hover:shadow-lg ${
+                      esc.status === 'resolved' ? 'border-green-500 bg-green-50' :
                       esc.priority === 'critical' ? 'border-red-500 bg-red-50' :
                       esc.priority === 'high' ? 'border-orange-500 bg-orange-50' :
                       'border-yellow-500 bg-yellow-50'
@@ -3481,15 +3605,28 @@ function Dashboard({ user, onLogout }) {
                     <div className="flex justify-between items-start">
                       <div>
                         <span className={`text-xs font-bold uppercase ${
+                          esc.status === 'resolved' ? 'text-green-700' :
                           esc.priority === 'critical' ? 'text-red-700' :
                           esc.priority === 'high' ? 'text-orange-700' : 'text-yellow-700'
                         }`}>
-                          {esc.priority} • {esc.issue_type?.replace(/_/g, ' ')}
+                          {esc.status === 'resolved' ? 'resolved' : esc.priority} • {esc.issue_type?.replace(/_/g, ' ')}
                         </span>
                         <p className="font-medium mt-1">{esc.description}</p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {new Date(esc.created_at).toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <p className="text-xs text-gray-500">
+                            {new Date(esc.created_at).toLocaleString()}
+                          </p>
+                          {esc.status === 'resolved' && esc.resolved_at && (
+                            <p className="text-xs text-green-600">
+                              Resolved {new Date(esc.resolved_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        {esc.status === 'resolved' && esc.resolution_notes && (
+                          <p className="text-xs text-green-700 mt-1 italic">
+                            {esc.resolution_notes}
+                          </p>
+                        )}
                       </div>
                       <ChevronRight className="h-5 w-5 text-gray-400" />
                     </div>
@@ -3497,6 +3634,318 @@ function Dashboard({ user, onLogout }) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* System Logic Tab */}
+        {activeTab === 'intelligence' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold">System Logic</h2>
+            <p className="text-sm text-slate-500 -mt-4">How the AI coordinator makes decisions — architecture, rules, and learned intelligence.</p>
+
+            {/* Tier Architecture Overview */}
+            <div>
+              <h3 className="text-base font-semibold text-slate-800 mb-3">Decision Architecture</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Tier 1 Card */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="bg-emerald-600 px-5 py-3 flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-white" />
+                  <h3 className="text-white font-semibold">Tier 1 — Rules Engine</h3>
+                  <span className="ml-auto text-emerald-100 text-xs font-mono bg-emerald-700 px-2 py-0.5 rounded">$0 / run</span>
+                </div>
+                <div className="p-5 space-y-3">
+                  <p className="text-sm text-slate-600">
+                    Deterministic threshold checks that handle ~90% of routine situations with zero LLM tokens.
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Critical runout</span> <span className="text-slate-500">— &lt;12h to runout, no active load → immediate escalation</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">High risk</span> <span className="text-slate-500">— &lt;24h to runout, no active load → high-priority escalation</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Stale ETA</span> <span className="text-slate-500">— Load ETA &gt;4h old → auto-send ETA request email</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Delayed load</span> <span className="text-slate-500">— Status DELAYED → auto-send ETA request email</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Unreliable carrier</span> <span className="text-slate-500">— Reliability score &lt;0.4 → flag for Tier 2 review</span></div>
+                    </div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3 mt-3">
+                    <p className="text-xs text-emerald-700 font-medium">Actions: create_escalation, send_eta_email</p>
+                    <p className="text-xs text-emerald-600 mt-1">Respects execution mode (Draft Only / Auto Email / Full Auto)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tier 2 Card */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="bg-violet-600 px-5 py-3 flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-white" />
+                  <h3 className="text-white font-semibold">Tier 2 — LLM Agent</h3>
+                  <span className="ml-auto text-violet-100 text-xs font-mono bg-violet-700 px-2 py-0.5 rounded">~$0.01-0.02 / call</span>
+                </div>
+                <div className="p-5 space-y-3">
+                  <p className="text-sm text-slate-600">
+                    Claude-powered analysis that only fires when Tier 1 flags ambiguous situations needing judgment.
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-violet-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Ambiguous inventory</span> <span className="text-slate-500">— Below threshold but loads active with complications</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-violet-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Unreliable carrier</span> <span className="text-slate-500">— Carrier flagged unreliable, LLM decides severity + wording</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-violet-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Multi-site risk</span> <span className="text-slate-500">— Same carrier late on multiple loads simultaneously</span></div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-violet-500 mt-1.5 flex-shrink-0" />
+                      <div className="text-sm"><span className="font-medium text-slate-800">Crafted escalations</span> <span className="text-slate-500">— LLM writes context-rich descriptions with knowledge graph data</span></div>
+                    </div>
+                  </div>
+                  <div className="bg-violet-50 rounded-lg p-3 mt-3">
+                    <p className="text-xs text-violet-700 font-medium">Enriched with: carrier reliability, site history, false alarm rates</p>
+                    <p className="text-xs text-violet-600 mt-1">Only invoked on Tier 1 flags — skipped entirely for routine runs</p>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </div>
+
+            {/* Knowledge Graph Section */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-slate-700" />
+                  <h3 className="text-base font-semibold text-slate-800">Knowledge Graph</h3>
+                  <span className="text-xs text-slate-500">Passive intelligence from operational data — zero LLM tokens</span>
+                </div>
+                <button
+                  onClick={() => refreshKgMutation.mutate()}
+                  disabled={refreshKgMutation.isPending}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${refreshKgMutation.isPending ? 'animate-spin' : ''}`} />
+                  {refreshKgMutation.isPending ? 'Rebuilding...' : 'Rebuild from data'}
+                </button>
+              </div>
+
+              {refreshKgMutation.data && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2 text-xs text-emerald-700 mb-3">
+                  Rebuilt: {refreshKgMutation.data.carriers_updated} carrier(s), {refreshKgMutation.data.sites_updated} site(s) updated
+                </div>
+              )}
+
+              {(!intelligenceData || (intelligenceData.carriers?.length === 0 && intelligenceData.sites?.length === 0)) ? (
+                <div className="bg-white rounded-xl p-8 text-center">
+                  <Brain className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm">No intelligence data yet. Click "Rebuild from data" to scan existing deliveries and escalations, or data will accumulate automatically over time.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Carrier Reliability */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                      <Truck className="h-4 w-4" /> Carrier Reliability
+                    </h4>
+                    {intelligenceData.carriers?.length === 0 ? (
+                      <div className="bg-white rounded-xl p-6 text-center text-sm text-slate-400">No carrier data yet</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {intelligenceData.carriers?.map((c) => (
+                          <div key={c.carrier_id} className="bg-white rounded-xl border border-slate-200 p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-slate-800">{c.carrier_name}</span>
+                              <div className="flex items-center gap-2">
+                                {c.flagged_unreliable && (
+                                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Unreliable</span>
+                                )}
+                                <div className={`text-sm font-bold ${
+                                  c.reliability_score >= 0.7 ? 'text-emerald-600' :
+                                  c.reliability_score >= 0.4 ? 'text-amber-600' : 'text-red-600'
+                                }`}>
+                                  {(c.reliability_score * 100).toFixed(0)}%
+                                </div>
+                              </div>
+                            </div>
+                            {/* Reliability Bar */}
+                            <div className="w-full bg-slate-100 rounded-full h-2 mb-3">
+                              <div
+                                className={`h-2 rounded-full transition-all ${
+                                  c.reliability_score >= 0.7 ? 'bg-emerald-500' :
+                                  c.reliability_score >= 0.4 ? 'bg-amber-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${c.reliability_score * 100}%` }}
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 text-center">
+                              <div>
+                                <div className="text-lg font-bold text-slate-800">{c.total_deliveries}</div>
+                                <div className="text-xs text-slate-500">Deliveries</div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-bold text-slate-800">{c.late_deliveries}</div>
+                                <div className="text-xs text-slate-500">Late</div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-bold text-slate-800">
+                                  {c.avg_delay_hours > 0 ? `${c.avg_delay_hours}h` : '—'}
+                                </div>
+                                <div className="text-xs text-slate-500">Avg Delay</div>
+                              </div>
+                            </div>
+                            {c.total_eta_requests > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                <span>ETA Requests: {c.eta_responses_received}/{c.total_eta_requests} responded</span>
+                                {c.avg_response_time_hours && (
+                                  <span>Avg response: {c.avg_response_time_hours}h</span>
+                                )}
+                              </div>
+                            )}
+                            {c.recent_deliveries?.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-100">
+                                <div className="text-xs text-slate-500 mb-1.5">Recent deliveries</div>
+                                <div className="flex gap-1">
+                                  {c.recent_deliveries.map((d, i) => (
+                                    <div
+                                      key={i}
+                                      title={`PO ${d.po_number} — ${d.on_time ? 'On time' : `Late by ${d.delay_hours}h`}`}
+                                      className={`w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center ${
+                                        d.on_time ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                                      }`}
+                                    >
+                                      {d.on_time ? '✓' : '✗'}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Site Intelligence */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                      <Fuel className="h-4 w-4" /> Site Intelligence
+                    </h4>
+                    {intelligenceData.sites?.length === 0 ? (
+                      <div className="bg-white rounded-xl p-6 text-center text-sm text-slate-400">No site data yet</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {intelligenceData.sites?.map((s) => (
+                          <div key={s.site_id} className="bg-white rounded-xl border border-slate-200 p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-medium text-slate-800">{s.site_code}</span>
+                                {s.site_name && <span className="text-sm text-slate-500 ml-2">{s.site_name}</span>}
+                              </div>
+                              <div className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                s.risk_score >= 0.7 ? 'bg-red-100 text-red-700' :
+                                s.risk_score >= 0.4 ? 'bg-amber-100 text-amber-700' :
+                                'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                Risk: {(s.risk_score * 100).toFixed(0)}%
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 text-center">
+                              <div>
+                                <div className="text-lg font-bold text-slate-800">{s.total_escalations}</div>
+                                <div className="text-xs text-slate-500">Escalations</div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-bold text-slate-800">{s.false_alarm_count}</div>
+                                <div className="text-xs text-slate-500">False Alarms</div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-bold text-slate-800">{s.total_deliveries}</div>
+                                <div className="text-xs text-slate-500">Deliveries</div>
+                              </div>
+                            </div>
+                            {s.false_alarm_rate > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-100">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-500">False alarm rate</span>
+                                  <span className={`font-medium ${
+                                    s.false_alarm_rate >= 0.5 ? 'text-amber-600' : 'text-slate-700'
+                                  }`}>{(s.false_alarm_rate * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
+                                  <div
+                                    className={`h-1.5 rounded-full ${
+                                      s.false_alarm_rate >= 0.5 ? 'bg-amber-400' : 'bg-slate-300'
+                                    }`}
+                                    style={{ width: `${s.false_alarm_rate * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {s.recent_events?.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-100">
+                                <div className="text-xs text-slate-500 mb-1.5">Recent events</div>
+                                <div className="space-y-1">
+                                  {s.recent_events.slice(-3).map((evt, i) => (
+                                    <div key={i} className="text-xs text-slate-600 flex items-center gap-1.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                        evt.type === 'delivery' ? 'bg-blue-500' :
+                                        evt.type === 'escalation_resolved' ? 'bg-green-500' : 'bg-slate-400'
+                                      }`} />
+                                      <span className="truncate">{evt.details}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Event Hooks Diagram */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">How Intelligence Accumulates</h4>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                  <Truck className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+                  <div className="text-xs font-semibold text-blue-800">Load Delivered</div>
+                  <div className="text-[11px] text-blue-600 mt-1">Carrier on-time rate, site delivery count</div>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                  <Bell className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                  <div className="text-xs font-semibold text-amber-800">Escalation Resolved</div>
+                  <div className="text-[11px] text-amber-600 mt-1">Site false alarm rate, risk score</div>
+                </div>
+                <div className="bg-violet-50 rounded-lg p-3 text-center">
+                  <Mail className="h-5 w-5 text-violet-600 mx-auto mb-1" />
+                  <div className="text-xs font-semibold text-violet-800">ETA Email Reply</div>
+                  <div className="text-[11px] text-violet-600 mt-1">Carrier response time, reliability</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <AlertTriangle className="h-5 w-5 text-red-600 mx-auto mb-1" />
+                  <div className="text-xs font-semibold text-red-800">Non-ETA Email</div>
+                  <div className="text-[11px] text-red-600 mt-1">Auto-escalate: shortages, breakdowns, cancellations</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

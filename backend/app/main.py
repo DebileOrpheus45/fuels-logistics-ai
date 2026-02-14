@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app.database import engine, Base
 from app.config import get_settings
-from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound, auth, sheets
+from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound, auth, sheets, intelligence
 from app.schemas import DashboardStats
 from app.auth import get_current_user
 from app.models import User
@@ -72,6 +72,7 @@ app.include_router(snapshots.router)
 app.include_router(staleness.router)
 app.include_router(email_inbound.router)
 app.include_router(sheets.router)
+app.include_router(intelligence.router)
 
 
 @app.get("/")

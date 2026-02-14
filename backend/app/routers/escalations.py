@@ -127,7 +127,8 @@ def update_escalation(
     update_data = escalation.model_dump(exclude_unset=True)
 
     # If resolving, set the resolved timestamp
-    if update_data.get('status') == EscalationStatus.RESOLVED:
+    is_resolving = update_data.get('status') == EscalationStatus.RESOLVED
+    if is_resolving:
         update_data['resolved_at'] = datetime.utcnow()
 
     for field, value in update_data.items():
@@ -135,6 +136,17 @@ def update_escalation(
 
     db.commit()
     db.refresh(db_escalation)
+
+    # Update knowledge graph on resolution
+    if is_resolving:
+        try:
+            from app.services.knowledge_graph import on_escalation_resolved
+            notes = (update_data.get('resolution_notes') or '').lower()
+            was_false_alarm = any(kw in notes for kw in ['false alarm', 'resolved itself', 'no action needed', 'not needed'])
+            on_escalation_resolved(escalation_id, was_false_alarm=was_false_alarm)
+        except Exception:
+            pass
+
     return db_escalation
 
 
@@ -175,6 +187,16 @@ def resolve_escalation(
 
     db.commit()
     db.refresh(db_escalation)
+
+    # Update knowledge graph
+    try:
+        from app.services.knowledge_graph import on_escalation_resolved
+        notes = (resolution_notes or '').lower()
+        was_false_alarm = any(kw in notes for kw in ['false alarm', 'resolved itself', 'no action needed', 'not needed'])
+        on_escalation_resolved(escalation_id, was_false_alarm=was_false_alarm)
+    except Exception:
+        pass
+
     return db_escalation
 
 

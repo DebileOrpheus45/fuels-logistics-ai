@@ -433,9 +433,13 @@ class CoordinatorAgent:
         else:
             return f"Unknown tool: {tool_name}"
 
-    def run_check_cycle(self) -> Dict[str, Any]:
+    def run_check_cycle(self, override_context: Optional[str] = None) -> Dict[str, Any]:
         """
         Run one check cycle - analyze all assigned sites and take actions.
+
+        Args:
+            override_context: If provided, use this instead of building full context.
+                             Used by Tier 2 to pass only flagged situations.
 
         Returns:
             Summary of actions taken during this cycle
@@ -443,9 +447,9 @@ class CoordinatorAgent:
         try:
             self.actions_taken = []
 
-            # Build context
-            context = self._build_context()
-            logger.info(f"[Agent {self.agent_id}] Starting check cycle")
+            # Build context (or use override for Tier 2)
+            context = override_context or self._build_context()
+            logger.info(f"[Agent {self.agent_id}] Starting check cycle {'(Tier 2)' if override_context else '(full)'}")
             logger.info(f"Context:\n{context}")
 
             # Initial message to Claude
@@ -528,7 +532,15 @@ class CoordinatorAgent:
 
 
 def run_agent_check(agent_id: int) -> Dict[str, Any]:
-    """Run a single check cycle for an agent, recording run history."""
+    """
+    Run a tiered check cycle for an agent, recording run history.
+
+    Tier 1: Rules engine (zero tokens) handles threshold checks, template emails
+    Tier 2: LLM agent (tokens) fires ONLY when Tier 1 flags ambiguous situations
+    """
+    from app.agents.rules_engine import run_rules_check, execute_tier1_actions
+    from app.services.knowledge_graph import get_carrier_intelligence, get_site_intelligence
+
     db = SessionLocal()
     started_at = datetime.utcnow()
 
@@ -557,37 +569,90 @@ def run_agent_check(agent_id: int) -> Dict[str, Any]:
         db.add(run_record)
         db.commit()
         db.refresh(run_record)
+        run_record_id = run_record.id
         db.close()
 
-        # Run the actual check
-        agent = CoordinatorAgent(agent_id)
-        result = agent.run_check_cycle()
+        all_actions = []
+        api_calls = 0
+        tier2_used = False
+
+        # ── TIER 1: Rules Engine (zero tokens) ──
+        logger.info(f"[Agent {agent_id}] Running Tier 1 rules engine...")
+        rules_result = run_rules_check(agent_id)
+        tier1_executed = execute_tier1_actions(agent_id, rules_result.actions)
+        all_actions.extend(tier1_executed)
+
+        # ── TIER 2: LLM Agent (only if Tier 1 flagged ambiguity) ──
+        if rules_result.tier2_flags:
+            logger.info(f"[Agent {agent_id}] Tier 1 flagged {len(rules_result.tier2_flags)} items for Tier 2 LLM review")
+            tier2_used = True
+
+            # Build enriched context with knowledge graph data
+            tier2_context = "## Tier 2 Review — Situations requiring nuanced judgment\n\n"
+            tier2_context += "The rules engine has already handled routine actions. "
+            tier2_context += "Please review these flagged situations that may need your judgment:\n\n"
+
+            for flag in rules_result.tier2_flags:
+                tier2_context += f"### Flag: {flag['reason']}\n"
+                for k, v in flag.get('details', {}).items():
+                    tier2_context += f"- {k}: {v}\n"
+
+                # Enrich with knowledge graph
+                if 'carrier_id' in flag:
+                    intel = get_carrier_intelligence(flag['carrier_id'])
+                    if intel:
+                        tier2_context += f"- **Carrier intelligence**: reliability={intel['reliability_score']}, "
+                        tier2_context += f"late_rate={intel['late_rate']}, avg_delay={intel['avg_delay_hours']}h\n"
+                if 'site_id' in flag:
+                    intel = get_site_intelligence(flag['site_id'])
+                    if intel:
+                        tier2_context += f"- **Site intelligence**: risk={intel['risk_score']}, "
+                        tier2_context += f"false_alarm_rate={intel['false_alarm_rate']}\n"
+                tier2_context += "\n"
+
+            try:
+                agent = CoordinatorAgent(agent_id)
+                # Override context to only include flagged items (not full site scan)
+                tier2_result = agent.run_check_cycle(override_context=tier2_context)
+                api_calls = tier2_result.get("iterations", 0)
+                all_actions.extend(tier2_result.get("actions_taken", []))
+            except Exception as e:
+                logger.error(f"[Agent {agent_id}] Tier 2 failed (non-fatal): {e}")
+        else:
+            logger.info(f"[Agent {agent_id}] No Tier 2 flags — rules engine handled everything")
 
         # Update run record with results
         db = SessionLocal()
-        run_record = db.query(AgentRunHistory).filter(AgentRunHistory.id == run_record.id).first()
+        run_record = db.query(AgentRunHistory).filter(AgentRunHistory.id == run_record_id).first()
         completed_at = datetime.utcnow()
         run_record.completed_at = completed_at
         run_record.duration_seconds = (completed_at - started_at).total_seconds()
-        run_record.api_calls = result.get("iterations", 0)
+        run_record.api_calls = api_calls
 
-        if result.get("success"):
-            run_record.status = AgentRunStatus.COMPLETED
-            actions = result.get("actions_taken", [])
-            run_record.emails_sent = sum(1 for a in actions if a["type"] == "email_sent")
-            run_record.escalations_created = sum(1 for a in actions if a["type"] == "escalation_created")
-            run_record.decisions = [
-                {"type": a["type"], "summary": str(a.get("details", {}).get("description", a.get("details", {}))[:120])}
-                for a in actions
-            ]
-        else:
-            run_record.status = AgentRunStatus.FAILED
-            run_record.error_message = result.get("error", "Unknown error")
+        run_record.status = AgentRunStatus.COMPLETED
+        run_record.emails_sent = sum(1 for a in all_actions if a["type"] in ("email_sent", "email_drafted"))
+        run_record.escalations_created = sum(1 for a in all_actions if a["type"] in ("escalation_created", "escalation_drafted"))
+        run_record.decisions = [
+            {
+                "type": a["type"],
+                "summary": str(a.get("details", {}).get("description", str(a.get("details", {}))))[:120],
+                "tier": "tier2" if tier2_used and i >= len(tier1_executed) else "tier1"
+            }
+            for i, a in enumerate(all_actions)
+        ]
 
         db.commit()
         db.close()
 
-        return result
+        return {
+            "success": True,
+            "iterations": api_calls,
+            "actions_taken": all_actions,
+            "tier1_actions": len(tier1_executed),
+            "tier2_flags": len(rules_result.tier2_flags),
+            "tier2_used": tier2_used,
+            "summary": rules_result.summary
+        }
 
     except Exception as e:
         # Mark as failed if something went wrong
