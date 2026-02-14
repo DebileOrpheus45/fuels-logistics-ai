@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 
@@ -21,10 +22,21 @@ class Settings(BaseSettings):
     debug: bool = True
     log_level: str = "INFO"
 
+    # CORS - comma-separated allowed origins for production
+    cors_origins: str = ""
+
     # Agent Settings
     agent_check_interval_minutes: int = 15
     default_runout_threshold_hours: float = 48.0
     critical_runout_threshold_hours: float = 24.0
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def fix_postgres_url(cls, v: str) -> str:
+        # Railway injects postgres:// but SQLAlchemy 2.0 requires postgresql://
+        if v and v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql://", 1)
+        return v
 
     class Config:
         env_file = ".env"
