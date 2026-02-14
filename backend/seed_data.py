@@ -10,9 +10,10 @@ Usage:
 from datetime import datetime, timedelta
 from app.database import SessionLocal, engine, Base
 from app.models import (
-    Site, Carrier, Lane, Load, AIAgent,
-    LoadStatus, AgentStatus, AgentExecutionMode
+    Site, Carrier, Lane, Load, AIAgent, User,
+    LoadStatus, AgentStatus, AgentExecutionMode, UserRole
 )
+from app.auth import get_password_hash
 
 
 def seed_database():
@@ -22,9 +23,34 @@ def seed_database():
     db = SessionLocal()
 
     try:
-        # Check if already seeded
+        # Ensure users exist (even if other data already seeded)
+        if db.query(User).count() == 0:
+            users = [
+                User(
+                    username="admin",
+                    email="admin@fuelslogistics.com",
+                    full_name="System Admin",
+                    password_hash=get_password_hash("admin123"),
+                    role=UserRole.ADMIN,
+                    is_active=True,
+                ),
+                User(
+                    username="coordinator",
+                    email="coordinator@fuelslogistics.com",
+                    full_name="Fuel Coordinator",
+                    password_hash=get_password_hash("fuel2024"),
+                    role=UserRole.OPERATOR,
+                    is_active=True,
+                ),
+            ]
+            for user in users:
+                db.add(user)
+            db.commit()
+            print(f"Created {len(users)} users (admin/admin123, coordinator/fuel2024)")
+
+        # Check if rest of data already seeded
         if db.query(Site).count() > 0:
-            print("Database already has data. Skipping seed.")
+            print("Sites already exist. Skipping remaining seed data.")
             return
 
         print("Seeding database with test data...")

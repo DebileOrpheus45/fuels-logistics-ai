@@ -32,12 +32,12 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("database_initialized")
 
-    # Auto-seed if database is empty (first deploy)
+    # Auto-seed if database has no users (first deploy)
     from app.database import SessionLocal
-    from app.models import Site
+    from app.models import User
     try:
         db = SessionLocal()
-        if db.query(Site).count() == 0:
+        if db.query(User).count() == 0:
             logger.info("empty_database_detected", action="auto_seeding")
             db.close()
             from seed_data import seed_database
