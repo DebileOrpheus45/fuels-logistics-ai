@@ -2119,22 +2119,13 @@ function AgentManagementPanel({ agents, sites }) {
 function LoadDetailsSidebar({ load: initialLoad, onClose }) {
   if (!initialLoad) return null
 
-  // BYPASS CACHE - Fetch fresh data directly from API
+  // Fetch fresh data via API client (uses auth token + correct base URL)
   const [freshLoad, setFreshLoad] = useState(initialLoad)
 
   useEffect(() => {
-    // Fetch fresh data on mount
-    fetch('http://localhost:8000/api/loads/active')
-      .then(res => res.json())
+    getActiveLoads()
       .then(loads => {
         const fresh = loads.find(l => l.id === initialLoad.id)
-        console.log('🔥 FRESH LOAD DATA FROM API:', {
-          po: fresh?.po_number,
-          tracking_count: fresh?.tracking_points?.length,
-          origin: fresh?.origin_address,
-          dest: fresh?.destination_address,
-          raw: fresh
-        })
         if (fresh) {
           setFreshLoad(fresh)
         }
