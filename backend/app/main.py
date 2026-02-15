@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("application_startup", version="0.4.0")
+    logger.info("email_config", gmail_enabled=settings.gmail_enabled, gmail_user=settings.gmail_user or "(not set)")
 
     # Create database tables
     Base.metadata.create_all(bind=engine)
