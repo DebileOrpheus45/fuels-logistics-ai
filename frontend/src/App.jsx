@@ -2504,13 +2504,31 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
   })
 
   const emailOneMutation = useMutation({
-    mutationFn: (loadId) => requestEtaForLoad(loadId),
-    onSuccess: () => queryClient.invalidateQueries(['loads'])
+    mutationFn: (loadId) => {
+      console.log('[Email] Sending ETA request for load:', loadId)
+      return requestEtaForLoad(loadId)
+    },
+    onSuccess: (data, loadId) => {
+      console.log('[Email] Success for load', loadId, data)
+      queryClient.invalidateQueries(['loads'])
+    },
+    onError: (err, loadId) => {
+      console.error('[Email] Failed for load', loadId, err?.response?.data || err.message)
+    }
   })
 
   const emailAllMutation = useMutation({
-    mutationFn: () => requestEtaForAllLoads(),
-    onSuccess: () => queryClient.invalidateQueries(['loads'])
+    mutationFn: () => {
+      console.log('[Email] Sending ETA request to all carriers')
+      return requestEtaForAllLoads()
+    },
+    onSuccess: (data) => {
+      console.log('[Email] Mass email result:', data)
+      queryClient.invalidateQueries(['loads'])
+    },
+    onError: (err) => {
+      console.error('[Email] Mass email failed:', err?.response?.data || err.message)
+    }
   })
 
   // Sorting function
@@ -2701,6 +2719,11 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
             {emailAllMutation.isSuccess && (
               <span className="text-xs text-green-600 font-medium">
                 Sent {emailAllMutation.data?.sent_count || 0} emails
+              </span>
+            )}
+            {emailAllMutation.isError && (
+              <span className="text-xs text-red-600 font-medium">
+                Failed: {emailAllMutation.error?.response?.data?.detail || emailAllMutation.error?.message || 'Unknown error'}
               </span>
             )}
           </div>
