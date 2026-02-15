@@ -35,7 +35,9 @@ import {
   getSheetsStatus,
   getIntelligence,
   refreshKnowledgeGraph,
-  getStatusSummary
+  getStatusSummary,
+  requestEtaForLoad,
+  requestEtaForAllLoads
 } from './api/client'
 import {
   Fuel,
@@ -2510,6 +2512,16 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
     }
   })
 
+  const emailOneMutation = useMutation({
+    mutationFn: (loadId) => requestEtaForLoad(loadId),
+    onSuccess: () => queryClient.invalidateQueries(['loads'])
+  })
+
+  const emailAllMutation = useMutation({
+    mutationFn: () => requestEtaForAllLoads(),
+    onSuccess: () => queryClient.invalidateQueries(['loads'])
+  })
+
   // Sorting function
   const handleSort = (key) => {
     let direction = 'asc'
@@ -2661,30 +2673,46 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
               </span>
             )}
           </div>
-          {onFilterChange && (
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => onFilterChange('all')}
-                className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${
-                  statusFilter === 'all'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => onFilterChange('DELAYED')}
-                className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${
-                  statusFilter === 'DELAYED'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                Delayed
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {onFilterChange && (
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => onFilterChange('all')}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${
+                    statusFilter === 'all'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => onFilterChange('DELAYED')}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${
+                    statusFilter === 'DELAYED'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Delayed
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => emailAllMutation.mutate()}
+              disabled={emailAllMutation.isPending}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 transition"
+              title="Send ETA request emails to all active load carriers"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              {emailAllMutation.isPending ? 'Sending...' : 'Email All Carriers'}
+            </button>
+            {emailAllMutation.isSuccess && (
+              <span className="text-xs text-green-600 font-medium">
+                Sent {emailAllMutation.data?.sent_count || 0} emails
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Search and Clear Filters Row */}
@@ -2777,12 +2805,13 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                   {getSortIcon('status')}
                 </div>
               </th>
+              <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredAndSortedLoads?.length === 0 && (
               <tr>
-                <td colSpan="7" className="px-5 py-8 text-center text-slate-400">
+                <td colSpan="8" className="px-5 py-8 text-center text-slate-400">
                   No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} loads found
                 </td>
               </tr>
@@ -2839,10 +2868,23 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                   <td className="px-5 py-4 whitespace-nowrap">
                     {getStatusBadge(load.status)}
                   </td>
+                  <td className="px-5 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                    {(load.status === 'in_transit' || load.status === 'scheduled' || load.status === 'delayed') && (
+                      <button
+                        onClick={() => emailOneMutation.mutate(load.id)}
+                        disabled={emailOneMutation.isPending && emailOneMutation.variables === load.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition"
+                        title={`Request ETA from ${load.carrier?.carrier_name || 'carrier'}`}
+                      >
+                        <Mail className="h-3 w-3" />
+                        Email
+                      </button>
+                    )}
+                  </td>
                 </tr>
                 {expandedLoadId === load.id && (
                   <tr key={`${load.id}-notes`}>
-                    <td colSpan="7" className="px-5 py-4 bg-slate-50 border-t border-slate-100">
+                    <td colSpan="8" className="px-5 py-4 bg-slate-50 border-t border-slate-100">
                       <div className="space-y-4">
                         {/* Existing Notes */}
                         <div>
@@ -3640,8 +3682,21 @@ function Dashboard({ user, onLogout }) {
         {/* System Logic Tab */}
         {activeTab === 'intelligence' && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold">System Logic</h2>
-            <p className="text-sm text-slate-500 -mt-4">How the AI coordinator makes decisions — architecture, rules, and learned intelligence.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">System Logic</h2>
+                <p className="text-sm text-slate-500">How the AI coordinator makes decisions — architecture, rules, and learned intelligence.</p>
+              </div>
+              <a
+                href={`${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')}/docs`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                API Docs (Swagger)
+              </a>
+            </div>
 
             {/* Tier Architecture Overview */}
             <div>
