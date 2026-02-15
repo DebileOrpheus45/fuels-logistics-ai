@@ -23,9 +23,10 @@ class EmailService:
 
     def __init__(self):
         self.sent_emails = []  # In-memory log for testing/history
-        self.gmail_enabled = settings.gmail_enabled
         self.gmail_user = settings.gmail_user
         self.gmail_app_password = settings.gmail_app_password
+        # Auto-enable Gmail if credentials are present (no separate flag needed)
+        self.gmail_enabled = settings.gmail_enabled or bool(self.gmail_user and self.gmail_app_password)
 
     def _send_via_gmail_smtp(
         self,
