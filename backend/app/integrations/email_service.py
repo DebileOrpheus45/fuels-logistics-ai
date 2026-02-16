@@ -69,8 +69,9 @@ class EmailService:
             text_part = MIMEText(body, 'plain')
             msg.attach(text_part)
 
-            # Connect to Gmail SMTP
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            # Connect to Gmail SMTP (port 587 + STARTTLS for better container compatibility)
+            with smtplib.SMTP('smtp.gmail.com', 587) as server:
+                server.starttls()
                 server.login(self.gmail_user, self.gmail_app_password)
                 server.send_message(msg)
 
