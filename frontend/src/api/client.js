@@ -2,7 +2,6 @@ import axios from 'axios'
 
 // Use environment variable or fallback to localhost for development
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-const AUTH_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'
 
 // Token storage key
 const TOKEN_KEY = 'fuels_auth_token'
@@ -43,16 +42,14 @@ export const login = async (username, password) => {
   formData.append('username', username)
   formData.append('password', password)
 
-  // Auth endpoint is at /auth (no /api prefix)
-  const response = await axios.post(`${AUTH_BASE_URL}/auth/login`, formData, {
+  const response = await axios.post(`${API_BASE_URL}/auth/login`, formData, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   })
 
   const { access_token } = response.data
   localStorage.setItem(TOKEN_KEY, access_token)
 
-  // Fetch user info (auth/me is also without /api prefix)
-  const userResponse = await axios.get(`${AUTH_BASE_URL}/auth/me`, {
+  const userResponse = await axios.get(`${API_BASE_URL}/auth/me`, {
     headers: { Authorization: `Bearer ${access_token}` }
   })
   localStorage.setItem(USER_KEY, JSON.stringify(userResponse.data))

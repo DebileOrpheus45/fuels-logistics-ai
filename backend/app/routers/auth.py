@@ -19,7 +19,7 @@ from app.auth import (
     get_admin_user
 )
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
 
 # Pydantic schemas
