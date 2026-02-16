@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 import smtplib
+import socket
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -69,9 +70,13 @@ class EmailService:
             text_part = MIMEText(body, 'plain')
             msg.attach(text_part)
 
-            # Connect to Gmail SMTP (port 587 + STARTTLS for better container compatibility)
-            with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            # Force IPv4 resolution (Docker containers often fail on IPv6)
+            smtp_ip = socket.getaddrinfo('smtp.gmail.com', 587, socket.AF_INET)[0][4][0]
+            logger.info(f"[GMAIL] Connecting to {smtp_ip}:587 (resolved from smtp.gmail.com)")
+            with smtplib.SMTP(smtp_ip, 587, timeout=30) as server:
+                server.ehlo('fuelslogistics.app')
                 server.starttls()
+                server.ehlo('fuelslogistics.app')
                 server.login(self.gmail_user, self.gmail_app_password)
                 server.send_message(msg)
 
