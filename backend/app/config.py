@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     # Anthropic API
     anthropic_api_key: str = ""
 
-    # SendGrid Email Configuration (HTTP API — works on Railway)
-    sendgrid_api_key: str = ""
-    sendgrid_from_email: str = "noreply@fuelslogistics.com"
-    sendgrid_from_name: str = "Fuels Logistics AI Coordinator"
+    # Resend Email Configuration (HTTP API — works on Railway)
+    resend_api_key: str = ""
+    resend_from_email: str = "onboarding@resend.dev"
+    resend_from_name: str = "Fuels Logistics AI Coordinator"
 
     # Gmail IMAP (inbound email polling only — NOT used for sending)
     gmail_user: str = ""

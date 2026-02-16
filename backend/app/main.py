@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("application_startup", version="0.4.0")
-    logger.info("email_config", sendgrid_configured=bool(settings.sendgrid_api_key), sendgrid_from=settings.sendgrid_from_email)
+    logger.info("email_config", resend_configured=bool(settings.resend_api_key), resend_from=settings.resend_from_email)
 
     # Create database tables
     Base.metadata.create_all(bind=engine)

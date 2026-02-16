@@ -344,7 +344,7 @@ class CoordinatorAgent:
             if not carrier or not carrier.dispatcher_email:
                 return "Cannot send email: No dispatcher email on file for carrier."
 
-            # Send email via SendGrid (or mock if not configured)
+            # Send email via Resend HTTP API
             # This executes only in AUTO_EMAIL or FULL_AUTO mode
             email_log = send_eta_request(
                 db=db,
@@ -375,7 +375,7 @@ class CoordinatorAgent:
             elif email_log.status.value == "failed":
                 return f"Email failed to send to {carrier.dispatcher_email}: {email_log.bounce_reason}"
             else:
-                return f"Email logged (SendGrid not configured) - would send to {carrier.dispatcher_email}"
+                return f"Email logged (Resend not configured) - would send to {carrier.dispatcher_email}"
 
         elif tool_name == "create_escalation":
             # Check execution mode

@@ -17,9 +17,9 @@ Railway Project
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | Reference to Railway Postgres plugin |
 | `JWT_SECRET_KEY` | `<random 32+ char string>` | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `CORS_ORIGINS` | `https://frontend-production-xxxx.up.railway.app` | Your frontend Railway URL |
-| `SENDGRID_API_KEY` | `SG.xxxx` | SendGrid API key (free: 100 emails/day) |
-| `SENDGRID_FROM_EMAIL` | `noreply@yourdomain.com` | Verified sender in SendGrid |
-| `SENDGRID_FROM_NAME` | `Fuels Logistics AI Coordinator` | Display name on outgoing emails |
+| `RESEND_API_KEY` | `re_xxxx` | Resend API key (free: 3,000 emails/month) |
+| `RESEND_FROM_EMAIL` | `onboarding@resend.dev` | Verified domain sender (or Resend test address) |
+| `RESEND_FROM_NAME` | `Fuels Logistics AI Coordinator` | Display name on outgoing emails |
 | `GMAIL_USER` | `you@gmail.com` | Gmail address for IMAP polling (inbound only) |
 | `GMAIL_APP_PASSWORD` | `xxxx xxxx xxxx xxxx` | Gmail App Password for IMAP polling |
 | `DEBUG` | `false` | Set false for production |
@@ -31,18 +31,18 @@ Railway Project
 
 **Important**: `VITE_API_URL` is baked at build time. Changing it requires a redeploy (not just restart).
 
-## Email Setup (SendGrid)
+## Email Setup (Resend)
 
-All outbound emails use **SendGrid HTTP API**. Railway blocks outbound SMTP (ports 25, 465, 587) on Hobby plan, so SMTP-based sending (Gmail, raw SMTP) will never work on Railway.
+All outbound emails use **Resend HTTP API**. Railway blocks outbound SMTP (ports 25, 465, 587) on Hobby plan, so SMTP-based sending (Gmail, raw SMTP) will never work on Railway.
 
-### SendGrid Setup
-1. Create a free SendGrid account at https://sendgrid.com (100 emails/day free)
-2. Verify a sender identity (Settings > Sender Authentication)
-3. Create an API key (Settings > API Keys > Create API Key > Full Access)
+### Resend Setup
+1. Create a free Resend account at https://resend.com (3,000 emails/month free)
+2. Add and verify a domain, or use `onboarding@resend.dev` for testing
+3. Create an API key (API Keys page)
 4. Set these env vars on Railway backend:
-   - `SENDGRID_API_KEY` = your API key
-   - `SENDGRID_FROM_EMAIL` = your verified sender email
-   - `SENDGRID_FROM_NAME` = display name (optional)
+   - `RESEND_API_KEY` = your API key (starts with `re_`)
+   - `RESEND_FROM_EMAIL` = your verified domain email (or `onboarding@resend.dev`)
+   - `RESEND_FROM_NAME` = display name (optional)
 
 ### Gmail IMAP (Inbound Only)
 Gmail credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) are only used for the **email poller** that reads inbound carrier replies via IMAP. They are NOT used for sending.
@@ -82,14 +82,14 @@ Gmail credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) are only used for the **e
 ### 7. `GMAIL_ENABLED=true` not parsed as boolean
 **Error**: Pydantic-settings on Railway wasn't parsing the `GMAIL_ENABLED` env var as `True`.
 
-**Fix**: Removed `GMAIL_ENABLED` flag entirely. Email sending now uses SendGrid HTTP API which auto-enables when `SENDGRID_API_KEY` is set.
+**Fix**: Removed `GMAIL_ENABLED` flag entirely. Email sending now uses Resend HTTP API which auto-enables when `RESEND_API_KEY` is set.
 
 ### 8. `[Errno 101] Network is unreachable` (Gmail SMTP)
 **Error**: `smtplib.SMTP` connections to `smtp.gmail.com` (ports 465, 587) fail on Railway Hobby plan.
 
 **Root cause**: Railway Hobby plan has a hard firewall block on ALL outbound SMTP traffic (ports 25, 465, 587). No amount of STARTTLS, IPv4 forcing, or timeout tuning will fix this.
 
-**Fix**: Replaced all SMTP-based email sending with **SendGrid HTTP API** (`sendgrid` Python library). HTTP requests (port 443) are not blocked.
+**Fix**: Replaced all SMTP-based email sending with **Resend HTTP API** (`resend` Python library). HTTP requests (port 443) are not blocked.
 
 ### 9. Hardcoded `localhost:8000` in frontend
 **Error**: `LoadDetailsSidebar` component had a hardcoded `fetch('http://localhost:8000/api/loads/active')` that bypassed the API client (no auth token, wrong URL in production).
@@ -99,9 +99,9 @@ Gmail credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) are only used for the **e
 ### 10. Railway blocks ALL outbound SMTP on Hobby plan
 **Error**: After trying SMTP_SSL:465, STARTTLS:587, and IPv4-forced connections, all failed with `[Errno 101] Network is unreachable`.
 
-**Root cause**: Railway intentionally blocks outbound SMTP on Hobby plan to prevent spam. This is documented in their community forums. Only Pro plan ($20/mo) unblocks SMTP.
+**Root cause**: Railway intentionally blocks outbound SMTP on Hobby plan to prevent spam. Only Pro plan ($20/mo) unblocks SMTP.
 
-**Fix**: Consolidated all email sending to SendGrid HTTP API. Removed Gmail SMTP (`app/integrations/email_service.py`), Gmail OAuth API (`app/integrations/gmail_service.py`), and mock email code paths. Single email service at `app/services/email_service.py`.
+**Fix**: Consolidated all email sending to Resend HTTP API. Removed Gmail SMTP, Gmail OAuth API, SendGrid, and mock email code paths. Single email service at `app/services/email_service.py`.
 
 ## Auto-Seed Behavior
 

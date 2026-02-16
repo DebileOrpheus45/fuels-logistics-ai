@@ -359,7 +359,7 @@ class EmailLog(Base):
     status = Column(Enum(EmailDeliveryStatus), default=EmailDeliveryStatus.PENDING, nullable=False)
 
     # Tracking IDs
-    message_id = Column(String(255), nullable=True, index=True)  # SendGrid message ID
+    message_id = Column(String(255), nullable=True, index=True)  # Resend message ID
     load_id = Column(Integer, ForeignKey("loads.id"), nullable=True)  # Related load if applicable
     carrier_id = Column(Integer, ForeignKey("carriers.id"), nullable=True)  # Related carrier
     sent_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User who triggered email

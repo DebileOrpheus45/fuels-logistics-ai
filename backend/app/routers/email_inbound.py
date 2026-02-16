@@ -166,7 +166,7 @@ def process_inbound_email(
     reply_result = None
 
     # Loop guard: never reply to ourselves
-    is_self = email.from_email.lower().strip() == settings.sendgrid_from_email.lower().strip()
+    is_self = email.from_email.lower().strip() == settings.resend_from_email.lower().strip()
 
     if is_self:
         logger.info(f"Skipping auto-reply: sender is self ({email.from_email})")

@@ -128,7 +128,7 @@ This roadmap transforms the Fuels Logistics AI Coordinator MVP from a demonstrat
 | Bounce/complaint webhook handling | 3 days | P2 | Medium - Reputation mgmt |
 
 **Deliverables:**
-- SendGrid/AWS SES integration with templating
+- Resend/AWS SES integration with templating
 - `EmailLog` table: recipient, template_id, sent_at, delivery_status, bounce_reason
 - Template editor UI (admin-only)
 - Webhook endpoints for delivery events
@@ -467,7 +467,7 @@ DATA PLANE (truth + confidence)                   ACTION PLANE (decide + act + g
 **Current (MVP):** FastAPI + PostgreSQL + APScheduler + Docker
 **Phase 1 Additions:**
 - **Authentication:** `python-jose[cryptography]` for JWT, `passlib[bcrypt]` for password hashing
-- **Email:** SendGrid or AWS SES SDK
+- **Email:** Resend or AWS SES SDK
 - **Structured Logging:** `structlog` with JSON formatter
 
 **Phase 2 Additions:**
@@ -592,7 +592,7 @@ DATA PLANE (truth + confidence)                   ACTION PLANE (decide + act + g
 |------|------------|--------|------------|
 | ATG vendor API is unstable/undocumented | Medium | High | Start with best-documented vendor (Veeder-Root), build fallback to CSV |
 | Customer IT blocks ATG integration (firewall/VPN) | High | High | Offer "pull from cloud aggregator" alternative, document VPN setup |
-| Email deliverability issues (spam filters) | Medium | High | Use reputable ESP (SendGrid), implement SPF/DKIM/DMARC, throttle sends |
+| Email deliverability issues (spam filters) | Medium | High | Use reputable ESP (Resend), implement SPF/DKIM/DMARC, throttle sends |
 | Customer data quality poor (garbage in) | High | Medium | Build confidence scoring + plausibility checks, train on data hygiene |
 | Carrier adoption low (don't reply to emails) | Medium | High | Start with 1-2 cooperative carriers per customer, manual fallback |
 | Security questionnaire blocks procurement | Medium | Very High | Complete Phase 1 security baseline first, prepare docs early |

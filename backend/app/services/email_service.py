@@ -1,8 +1,8 @@
 """
-Unified email service using SendGrid HTTP API.
+Unified email service using Resend HTTP API.
 
 This is the ONLY email service in the application.
-All email sending goes through SendGrid's HTTP API, which works on
+All email sending goes through Resend's HTTP API, which works on
 Railway, Render, and other platforms that block outbound SMTP.
 
 Usage:
@@ -14,8 +14,7 @@ import logging
 from typing import Optional
 from datetime import datetime
 
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content, Cc
+import resend
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -23,56 +22,59 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-def _get_sendgrid_config():
-    """Get SendGrid config from settings."""
+def _get_resend_config():
+    """Get Resend config from settings."""
     settings = get_settings()
     return {
-        "api_key": settings.sendgrid_api_key,
-        "from_email": settings.sendgrid_from_email,
-        "from_name": settings.sendgrid_from_name,
+        "api_key": settings.resend_api_key,
+        "from_email": settings.resend_from_email,
+        "from_name": settings.resend_from_name,
     }
 
 
-def _send_via_sendgrid(
+def _send_email(
     to_email: str,
     subject: str,
     body: str,
     cc: Optional[str] = None,
 ) -> dict:
     """
-    Send an email via SendGrid HTTP API.
+    Send an email via Resend HTTP API.
     This is the single source of truth for all email sending in the app.
     """
-    config = _get_sendgrid_config()
+    config = _get_resend_config()
 
     if not config["api_key"]:
         logger.warning(
-            f"[SendGrid] API key not configured — email NOT sent to {to_email}: {subject}"
+            f"[Resend] API key not configured — email NOT sent to {to_email}: {subject}"
         )
         return {
             "success": False,
-            "error": "SendGrid API key not configured. Set SENDGRID_API_KEY env var.",
+            "error": "Resend API key not configured. Set RESEND_API_KEY env var.",
             "to": to_email,
             "subject": subject,
-            "method": "sendgrid",
+            "method": "resend",
         }
 
     try:
-        message = Mail(
-            from_email=Email(config["from_email"], config["from_name"]),
-            to_emails=To(to_email),
-            subject=subject,
-            plain_text_content=Content("text/plain", body),
-        )
+        resend.api_key = config["api_key"]
+
+        from_field = f"{config['from_name']} <{config['from_email']}>"
+
+        params: dict = {
+            "from": from_field,
+            "to": [to_email],
+            "subject": subject,
+            "text": body,
+        }
         if cc:
-            message.add_cc(Cc(cc))
+            params["cc"] = [cc]
 
-        client = SendGridAPIClient(config["api_key"])
-        response = client.send(message)
+        response = resend.Emails.send(params)
 
-        message_id = response.headers.get("X-Message-Id", "")
+        message_id = response.get("id", "") if isinstance(response, dict) else ""
         logger.info(
-            f"[SendGrid] Sent to {to_email} | Subject: {subject} | ID: {message_id}"
+            f"[Resend] Sent to {to_email} | Subject: {subject} | ID: {message_id}"
         )
 
         return {
@@ -81,17 +83,17 @@ def _send_via_sendgrid(
             "to": to_email,
             "subject": subject,
             "sent_at": datetime.utcnow().isoformat(),
-            "method": "sendgrid",
+            "method": "resend",
         }
 
     except Exception as e:
-        logger.error(f"[SendGrid] Failed to send to {to_email}: {e}")
+        logger.error(f"[Resend] Failed to send to {to_email}: {e}")
         return {
             "success": False,
             "error": str(e),
             "to": to_email,
             "subject": subject,
-            "method": "sendgrid",
+            "method": "resend",
         }
 
 
@@ -100,7 +102,7 @@ def _send_via_sendgrid(
 # ---------------------------------------------------------------------------
 
 class EmailService:
-    """Lightweight wrapper around SendGrid for router-level email sending."""
+    """Lightweight wrapper around Resend for router-level email sending."""
 
     def __init__(self):
         self.sent_emails: list[dict] = []
@@ -134,7 +136,7 @@ class EmailService:
             f"Fuels Logistics AI Coordinator"
         )
 
-        result = _send_via_sendgrid(to_email, subject, body)
+        result = _send_email(to_email, subject, body)
 
         # In-memory log
         self.sent_emails.append({
@@ -145,7 +147,7 @@ class EmailService:
             "site_name": site_name,
             "sent_at": result.get("sent_at", datetime.utcnow().isoformat()),
             "success": result.get("success", False),
-            "method": "sendgrid",
+            "method": "resend",
         })
 
         # Activity stream
@@ -164,7 +166,7 @@ class EmailService:
                     "carrier_name": carrier_name,
                     "site_name": site_name,
                     "success": result.get("success", False),
-                    "method": "sendgrid",
+                    "method": "resend",
                 },
             ))
             db.commit()
@@ -186,7 +188,7 @@ class EmailService:
         if not subject.lower().startswith("re:"):
             subject = f"Re: {subject}"
 
-        result = _send_via_sendgrid(to_email, subject, body, cc=cc)
+        result = _send_email(to_email, subject, body, cc=cc)
 
         self.sent_emails.append({
             "to": to_email,
@@ -194,7 +196,7 @@ class EmailService:
             "subject": subject,
             "sent_at": result.get("sent_at", datetime.utcnow().isoformat()),
             "success": result.get("success", False),
-            "method": "sendgrid",
+            "method": "resend",
             "type": "auto_reply",
         })
 
@@ -226,7 +228,7 @@ def send_eta_request(
     """
     from app.models import EmailLog, EmailDeliveryStatus
 
-    config = _get_sendgrid_config()
+    config = _get_resend_config()
 
     site = load.destination_site
     subject = f"ETA Request - Load {load.po_number}"
@@ -262,7 +264,7 @@ def send_eta_request(
         sent_by_agent_id=sent_by_agent_id,
     )
 
-    result = _send_via_sendgrid(carrier.dispatcher_email, subject, body)
+    result = _send_email(carrier.dispatcher_email, subject, body)
 
     if result.get("success"):
         email_log.status = EmailDeliveryStatus.SENT

@@ -114,7 +114,7 @@ python start_email_poller.py
 - Docker for database containerization
 - JWT authentication with python-jose
 - Structlog for production logging
-- SendGrid / Gmail for email delivery
+- Resend for email delivery (HTTP API)
 - Google Sheets API (gspread) for dashboard sync
 
 **Frontend:**
@@ -258,7 +258,7 @@ Proprietary - All rights reserved
 - ✅ **UI Mode Toggle** - Admin control of agent autonomy level
 
 **Week 3 - Email Integration:**
-- ✅ **SendGrid Integration** - Production email sending with audit trail
+- ✅ **Resend Integration** - Production email sending with audit trail
 - ✅ **Gmail IMAP Poller** - Automated carrier ETA reply processing
 
 **Earlier Updates:**
