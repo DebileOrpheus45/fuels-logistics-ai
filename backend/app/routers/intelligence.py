@@ -19,6 +19,18 @@ def refresh_knowledge_graph(current_user: User = Depends(get_current_user)):
     return rebuild_knowledge_graph()
 
 
+@router.post("/seed-historical")
+def seed_historical(current_user: User = Depends(get_current_user)):
+    """Seed historical delivered loads and escalations, then rebuild knowledge graph."""
+    from seed_historical_data import seed_historical_data
+    import io, contextlib
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        seed_historical_data()
+    return {"output": buf.getvalue()}
+
+
 @router.get("/status-summary")
 def get_status_summary(current_user: User = Depends(get_current_user)):
     """Generate executive status summary from current state + knowledge graph."""
