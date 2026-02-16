@@ -1,246 +1,279 @@
 """
-Real email sending service using SendGrid.
+Unified email service using SendGrid HTTP API.
 
-Replaces the mocked email functionality with actual SMTP delivery.
+This is the ONLY email service in the application.
+All email sending goes through SendGrid's HTTP API, which works on
+Railway, Render, and other platforms that block outbound SMTP.
+
+Usage:
+  - Routers (loads, emails, email_inbound): import `email_service` singleton
+  - Agents (coordinator, rules engine): import `send_eta_request` function
 """
 
-import os
+import logging
 from typing import Optional
 from datetime import datetime
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
-import logging
 
-from app.models import EmailLog, EmailDeliveryStatus, Load, Carrier, User, AIAgent
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content, Cc
 from sqlalchemy.orm import Session
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# SendGrid configuration
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "noreply@fuelslogistics.com")
-SENDGRID_FROM_NAME = os.getenv("SENDGRID_FROM_NAME", "Fuels Logistics AI Coordinator")
-SENDGRID_ENABLED = os.getenv("SENDGRID_ENABLED", "false").lower() == "true"
 
+def _get_sendgrid_config():
+    """Get SendGrid config from settings."""
+    settings = get_settings()
+    return {
+        "api_key": settings.sendgrid_api_key,
+        "from_email": settings.sendgrid_from_email,
+        "from_name": settings.sendgrid_from_name,
+    }
+
+
+def _send_via_sendgrid(
+    to_email: str,
+    subject: str,
+    body: str,
+    cc: Optional[str] = None,
+) -> dict:
+    """
+    Send an email via SendGrid HTTP API.
+    This is the single source of truth for all email sending in the app.
+    """
+    config = _get_sendgrid_config()
+
+    if not config["api_key"]:
+        logger.warning(
+            f"[SendGrid] API key not configured — email NOT sent to {to_email}: {subject}"
+        )
+        return {
+            "success": False,
+            "error": "SendGrid API key not configured. Set SENDGRID_API_KEY env var.",
+            "to": to_email,
+            "subject": subject,
+            "method": "sendgrid",
+        }
+
+    try:
+        message = Mail(
+            from_email=Email(config["from_email"], config["from_name"]),
+            to_emails=To(to_email),
+            subject=subject,
+            plain_text_content=Content("text/plain", body),
+        )
+        if cc:
+            message.add_cc(Cc(cc))
+
+        client = SendGridAPIClient(config["api_key"])
+        response = client.send(message)
+
+        message_id = response.headers.get("X-Message-Id", "")
+        logger.info(
+            f"[SendGrid] Sent to {to_email} | Subject: {subject} | ID: {message_id}"
+        )
+
+        return {
+            "success": True,
+            "message_id": message_id,
+            "to": to_email,
+            "subject": subject,
+            "sent_at": datetime.utcnow().isoformat(),
+            "method": "sendgrid",
+        }
+
+    except Exception as e:
+        logger.error(f"[SendGrid] Failed to send to {to_email}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "to": to_email,
+            "subject": subject,
+            "method": "sendgrid",
+        }
+
+
+# ---------------------------------------------------------------------------
+# Singleton service — used by loads router, emails router, email_inbound
+# ---------------------------------------------------------------------------
 
 class EmailService:
-    """Service for sending emails via SendGrid and logging delivery."""
+    """Lightweight wrapper around SendGrid for router-level email sending."""
 
-    def __init__(self, db: Session):
-        self.db = db
-        self.client = None
-        if SENDGRID_ENABLED and SENDGRID_API_KEY:
-            self.client = SendGridAPIClient(SENDGRID_API_KEY)
+    def __init__(self):
+        self.sent_emails: list[dict] = []
 
-    def send_email(
+    def send_eta_request(
         self,
-        recipient: str,
+        to_email: str,
+        carrier_name: str,
+        po_number: str,
+        site_name: str,
+        hours_to_runout: Optional[float] = None,
+        driver_name: Optional[str] = None,
+    ) -> dict:
+        """Send ETA request email to a carrier dispatcher."""
+        urgency = ""
+        if hours_to_runout and hours_to_runout < 24:
+            urgency = f" URGENT: Site has only {hours_to_runout:.0f} hours of fuel remaining."
+        elif hours_to_runout and hours_to_runout < 48:
+            urgency = f" Note: Site has {hours_to_runout:.0f} hours of fuel remaining."
+
+        subject = f"ETA Request - PO #{po_number}"
+        body = (
+            f"Hi {carrier_name} Dispatch,\n\n"
+            f"Can you please provide an updated ETA for the following shipment?\n\n"
+            f"PO Number: {po_number}\n"
+            f"Destination: {site_name}\n"
+            + (f"Driver: {driver_name}\n" if driver_name else "")
+            + f"{urgency}\n\n"
+            f"Please reply with the expected arrival time.\n\n"
+            f"Thank you,\n"
+            f"Fuels Logistics AI Coordinator"
+        )
+
+        result = _send_via_sendgrid(to_email, subject, body)
+
+        # In-memory log
+        self.sent_emails.append({
+            "to": to_email,
+            "subject": subject,
+            "po_number": po_number,
+            "carrier_name": carrier_name,
+            "site_name": site_name,
+            "sent_at": result.get("sent_at", datetime.utcnow().isoformat()),
+            "success": result.get("success", False),
+            "method": "sendgrid",
+        })
+
+        # Activity stream
+        try:
+            from app.database import SessionLocal
+            from app.models import Activity, ActivityType
+
+            db = SessionLocal()
+            db.add(Activity(
+                agent_id=None,
+                activity_type=ActivityType.EMAIL_SENT,
+                details={
+                    "to": to_email,
+                    "subject": subject,
+                    "po_number": po_number,
+                    "carrier_name": carrier_name,
+                    "site_name": site_name,
+                    "success": result.get("success", False),
+                    "method": "sendgrid",
+                },
+            ))
+            db.commit()
+            db.close()
+        except Exception as e:
+            logger.warning(f"Failed to log email activity: {e}")
+
+        return result
+
+    def send_reply(
+        self,
+        to_email: str,
         subject: str,
         body: str,
-        template_id: Optional[str] = None,
-        load_id: Optional[int] = None,
-        carrier_id: Optional[int] = None,
-        sent_by_user_id: Optional[int] = None,
-        sent_by_agent_id: Optional[int] = None,
-    ) -> EmailLog:
-        """
-        Send an email and log the delivery.
+        original_message_id: Optional[str] = None,
+        cc: Optional[str] = None,
+    ) -> dict:
+        """Send a reply email (used by email_inbound auto-reply)."""
+        if not subject.lower().startswith("re:"):
+            subject = f"Re: {subject}"
 
-        Args:
-            recipient: Email address to send to
-            subject: Email subject line
-            body: Email body (plain text or HTML)
-            template_id: Optional template identifier
-            load_id: Optional related load ID
-            carrier_id: Optional related carrier ID
-            sent_by_user_id: Optional user who triggered the email
-            sent_by_agent_id: Optional agent who sent the email
+        result = _send_via_sendgrid(to_email, subject, body, cc=cc)
 
-        Returns:
-            EmailLog object with delivery status
-        """
-        # Create email log entry
-        email_log = EmailLog(
-            recipient=recipient,
-            subject=subject,
-            body=body,
-            template_id=template_id,
-            status=EmailDeliveryStatus.PENDING,
-            load_id=load_id,
-            carrier_id=carrier_id,
-            sent_by_user_id=sent_by_user_id,
-            sent_by_agent_id=sent_by_agent_id,
-        )
+        self.sent_emails.append({
+            "to": to_email,
+            "cc": cc,
+            "subject": subject,
+            "sent_at": result.get("sent_at", datetime.utcnow().isoformat()),
+            "success": result.get("success", False),
+            "method": "sendgrid",
+            "type": "auto_reply",
+        })
 
-        try:
-            if not SENDGRID_ENABLED or not self.client:
-                # SendGrid not configured - log only (like mock mode)
-                logger.warning(
-                    f"SendGrid disabled - email not sent to {recipient}: {subject}"
-                )
-                email_log.status = EmailDeliveryStatus.PENDING
-                email_log.bounce_reason = "SendGrid not configured (SENDGRID_ENABLED=false)"
-                self.db.add(email_log)
-                self.db.commit()
-                self.db.refresh(email_log)
-                return email_log
+        return result
 
-            # Create SendGrid message
-            message = Mail(
-                from_email=Email(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
-                to_emails=To(recipient),
-                subject=subject,
-                plain_text_content=Content("text/plain", body),
-            )
+    def get_sent_emails(self, limit: int = 10) -> list:
+        """Get recently sent emails (for /api/emails/sent endpoint)."""
+        return self.sent_emails[-limit:]
 
-            # Send via SendGrid
-            response = self.client.send(message)
 
-            # Update email log with success
-            email_log.status = EmailDeliveryStatus.SENT
-            email_log.sent_at = datetime.utcnow()
-            email_log.message_id = response.headers.get("X-Message-Id")
+# Singleton
+email_service = EmailService()
 
-            logger.info(
-                f"Email sent successfully to {recipient}: {subject} (Message ID: {email_log.message_id})"
-            )
 
-        except Exception as e:
-            # Update email log with failure
-            email_log.status = EmailDeliveryStatus.FAILED
-            email_log.bounce_reason = str(e)
-            logger.error(f"Failed to send email to {recipient}: {e}")
-
-        # Save to database
-        self.db.add(email_log)
-        self.db.commit()
-        self.db.refresh(email_log)
-
-        return email_log
-
-    def send_eta_request_email(
-        self,
-        load: Load,
-        carrier: Carrier,
-        sent_by_agent_id: Optional[int] = None,
-        sent_by_user_id: Optional[int] = None,
-    ) -> EmailLog:
-        """
-        Send ETA request email to carrier dispatcher.
-
-        This is the primary use case - agent requesting ETA from carrier.
-        """
-        subject = f"ETA Request - Load {load.po_number}"
-
-        body = f"""
-Dear {carrier.carrier_name} Dispatch,
-
-We are requesting an updated ETA for the following load:
-
-PO Number: {load.po_number}
-Destination: {load.destination_site.consignee_name} ({load.destination_site.consignee_code})
-Destination Address: {load.destination_site.address}
-Product: {load.product_type}
-Volume: {load.volume} gallons
-
-Current ETA: {load.current_eta.strftime('%Y-%m-%d %H:%M') if load.current_eta else 'Not provided'}
-Driver: {load.driver_name or 'Not assigned'}
-Driver Phone: {load.driver_phone or 'Not provided'}
-
-Please reply to this email with the updated ETA in one of these formats:
-- Military time (e.g., "1430")
-- 12-hour format (e.g., "2:30 PM")
-- Time range (e.g., "between 1400 and 1600")
-
-If you have any questions, please contact our dispatch team.
-
-Thank you,
-Fuels Logistics AI Coordinator
-
----
-This is an automated message. Please do not reply directly to this email address.
-Reply to: {SENDGRID_FROM_EMAIL}
-        """.strip()
-
-        return self.send_email(
-            recipient=carrier.dispatcher_email,
-            subject=subject,
-            body=body,
-            template_id="eta_request",
-            load_id=load.id,
-            carrier_id=carrier.id,
-            sent_by_agent_id=sent_by_agent_id,
-            sent_by_user_id=sent_by_user_id,
-        )
-
-    def get_email_history(
-        self,
-        load_id: Optional[int] = None,
-        carrier_id: Optional[int] = None,
-        limit: int = 100,
-    ) -> list[EmailLog]:
-        """Get email history, optionally filtered by load or carrier."""
-        query = self.db.query(EmailLog).order_by(EmailLog.created_at.desc())
-
-        if load_id:
-            query = query.filter(EmailLog.load_id == load_id)
-
-        if carrier_id:
-            query = query.filter(EmailLog.carrier_id == carrier_id)
-
-        return query.limit(limit).all()
-
-    def update_delivery_status(
-        self,
-        message_id: str,
-        status: EmailDeliveryStatus,
-        bounce_reason: Optional[str] = None,
-    ):
-        """
-        Update email delivery status based on webhook callback.
-
-        This would be called by a webhook endpoint that receives
-        SendGrid delivery events (delivered, bounced, complained, etc.)
-        """
-        email_log = (
-            self.db.query(EmailLog).filter(EmailLog.message_id == message_id).first()
-        )
-
-        if not email_log:
-            logger.warning(f"Email log not found for message ID: {message_id}")
-            return
-
-        email_log.status = status
-        email_log.updated_at = datetime.utcnow()
-
-        if status == EmailDeliveryStatus.DELIVERED:
-            email_log.delivered_at = datetime.utcnow()
-        elif status == EmailDeliveryStatus.BOUNCED:
-            email_log.bounced_at = datetime.utcnow()
-            email_log.bounce_reason = bounce_reason
-        elif status == EmailDeliveryStatus.COMPLAINED:
-            email_log.complaint_at = datetime.utcnow()
-
-        self.db.commit()
-        logger.info(f"Updated email status to {status} for message {message_id}")
-
+# ---------------------------------------------------------------------------
+# DB-based functions — used by coordinator_agent and rules_engine
+# ---------------------------------------------------------------------------
 
 def send_eta_request(
     db: Session,
-    load: Load,
-    carrier: Carrier,
+    load,
+    carrier,
     sent_by_agent_id: Optional[int] = None,
     sent_by_user_id: Optional[int] = None,
-) -> EmailLog:
+):
     """
-    Convenience function to send ETA request email.
+    Send ETA request email and log to EmailLog table.
+    Used by coordinator_agent.py and rules_engine.py.
+    """
+    from app.models import EmailLog, EmailDeliveryStatus
 
-    This is the function that agents will call.
-    """
-    email_service = EmailService(db)
-    return email_service.send_eta_request_email(
-        load=load,
-        carrier=carrier,
-        sent_by_agent_id=sent_by_agent_id,
-        sent_by_user_id=sent_by_user_id,
+    config = _get_sendgrid_config()
+
+    site = load.destination_site
+    subject = f"ETA Request - Load {load.po_number}"
+    body = (
+        f"Dear {carrier.carrier_name} Dispatch,\n\n"
+        f"We are requesting an updated ETA for the following load:\n\n"
+        f"PO Number: {load.po_number}\n"
+        f"Destination: {site.consignee_name} ({site.consignee_code})\n"
+        f"Destination Address: {site.address}\n"
+        f"Product: {load.product_type}\n"
+        f"Volume: {load.volume} gallons\n\n"
+        f"Current ETA: {load.current_eta.strftime('%Y-%m-%d %H:%M') if load.current_eta else 'Not provided'}\n"
+        f"Driver: {load.driver_name or 'Not assigned'}\n"
+        f"Driver Phone: {load.driver_phone or 'Not provided'}\n\n"
+        f"Please reply with the updated ETA.\n\n"
+        f"Thank you,\n"
+        f"Fuels Logistics AI Coordinator\n\n"
+        f"---\n"
+        f"This is an automated message.\n"
+        f"Reply to: {config['from_email']}"
     )
+
+    # Create email log entry
+    email_log = EmailLog(
+        recipient=carrier.dispatcher_email,
+        subject=subject,
+        body=body,
+        template_id="eta_request",
+        status=EmailDeliveryStatus.PENDING,
+        load_id=load.id,
+        carrier_id=carrier.id,
+        sent_by_user_id=sent_by_user_id,
+        sent_by_agent_id=sent_by_agent_id,
+    )
+
+    result = _send_via_sendgrid(carrier.dispatcher_email, subject, body)
+
+    if result.get("success"):
+        email_log.status = EmailDeliveryStatus.SENT
+        email_log.sent_at = datetime.utcnow()
+        email_log.message_id = result.get("message_id")
+    else:
+        email_log.status = EmailDeliveryStatus.FAILED
+        email_log.bounce_reason = result.get("error", "Unknown error")
+
+    db.add(email_log)
+    db.commit()
+    db.refresh(email_log)
+
+    return email_log

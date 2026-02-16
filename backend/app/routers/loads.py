@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models import Load, LoadStatus, Site, Carrier, User
 from app.schemas import LoadCreate, LoadUpdate, LoadResponse, LoadWithDetails
 from app.auth import get_current_user
-from app.integrations.email_service import email_service
+from app.services.email_service import email_service
 
 logger = logging.getLogger(__name__)
 

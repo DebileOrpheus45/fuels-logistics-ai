@@ -15,7 +15,7 @@ from app.models import (
     Escalation, IssueType, EscalationPriority,
 )
 from app.utils.email_parser import parse_eta_from_email_with_method, extract_po_number
-from app.integrations.email_service import email_service
+from app.services.email_service import email_service
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ def process_inbound_email(
     reply_result = None
 
     # Loop guard: never reply to ourselves
-    is_self = email.from_email.lower().strip() == settings.gmail_user.lower().strip()
+    is_self = email.from_email.lower().strip() == settings.sendgrid_from_email.lower().strip()
 
     if is_self:
         logger.info(f"Skipping auto-reply: sender is self ({email.from_email})")

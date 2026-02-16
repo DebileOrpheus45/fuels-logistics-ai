@@ -10,10 +10,14 @@ class Settings(BaseSettings):
     # Anthropic API
     anthropic_api_key: str = ""
 
-    # Gmail SMTP Configuration
-    gmail_user: str = ""  # Gmail address for sending emails
-    gmail_app_password: str = ""  # Gmail app password (not regular password)
-    gmail_enabled: bool = False  # Set to True to enable real email sending
+    # SendGrid Email Configuration (HTTP API — works on Railway)
+    sendgrid_api_key: str = ""
+    sendgrid_from_email: str = "noreply@fuelslogistics.com"
+    sendgrid_from_name: str = "Fuels Logistics AI Coordinator"
+
+    # Gmail IMAP (inbound email polling only — NOT used for sending)
+    gmail_user: str = ""
+    gmail_app_password: str = ""
 
     # Coordinator
     coordinator_email: str = ""  # CC address for escalation replies to carriers
