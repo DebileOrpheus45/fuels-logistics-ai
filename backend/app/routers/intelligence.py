@@ -38,6 +38,13 @@ def get_status_summary(current_user: User = Depends(get_current_user)):
     return {"summary": generate_status_summary()}
 
 
+@router.get("/full-summary")
+def get_full_summary(current_user: User = Depends(get_current_user)):
+    """Generate comprehensive knowledge graph narrative summary."""
+    from app.services.knowledge_graph import generate_knowledge_graph_summary
+    return {"summary": generate_knowledge_graph_summary()}
+
+
 @router.get("/carrier/{carrier_id}")
 def get_carrier_intel(carrier_id: int, current_user: User = Depends(get_current_user)):
     """Get intelligence for a specific carrier."""

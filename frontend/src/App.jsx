@@ -36,6 +36,7 @@ import {
   getIntelligence,
   refreshKnowledgeGraph,
   getStatusSummary,
+  getFullKgSummary,
   requestEtaForLoad,
   requestEtaForAllLoads
 } from './api/client'
@@ -90,7 +91,8 @@ import {
   Shield,
   TrendingUp,
   Target,
-  Layers
+  Layers,
+  FileText
 } from 'lucide-react'
 
 // ============== Login Page ==============
@@ -3230,6 +3232,85 @@ function Dashboard({ user, onLogout }) {
     }
   })
 
+  const [kgFullSummary, setKgFullSummary] = useState(null)
+
+  const kgSummaryMutation = useMutation({
+    mutationFn: getFullKgSummary,
+    onSuccess: (data) => setKgFullSummary(data.summary)
+  })
+
+  const exportCarriersCsv = () => {
+    if (!intelligenceData?.carriers?.length) return
+    const headers = [
+      'Carrier ID', 'Carrier Name', 'Reliability Score', 'Rating',
+      'Flagged Unreliable', 'Total Deliveries', 'On-Time', 'Late',
+      'On-Time Rate (%)', 'Avg Delay (hrs)', 'ETA Requests', 'ETA Responses',
+      'Response Rate (%)', 'Avg Response Time (hrs)', 'Recent Trend', 'Summary'
+    ]
+    const rows = intelligenceData.carriers.map(c => {
+      const onTimeRate = c.total_deliveries > 0
+        ? ((c.on_time_deliveries / c.total_deliveries) * 100).toFixed(1) : 'N/A'
+      const responseRate = c.total_eta_requests > 0
+        ? ((c.eta_responses_received / c.total_eta_requests) * 100).toFixed(1) : 'N/A'
+      const rating = c.reliability_score >= 0.7 ? 'Reliable'
+        : c.reliability_score >= 0.4 ? 'At Risk' : 'Unreliable'
+      const recent = c.recent_deliveries || []
+      const recentOnTime = recent.filter(d => d.on_time).length
+      const trend = recent.length > 0
+        ? `${recentOnTime}/${recent.length} on-time in last ${recent.length} deliveries` : 'No recent data'
+      let summary = `${c.carrier_name}: ${rating} with ${onTimeRate}% on-time rate across ${c.total_deliveries} deliveries.`
+      if (c.avg_delay_hours > 0) summary += ` Avg delay when late: ${c.avg_delay_hours}h.`
+      if (c.total_eta_requests > 0) summary += ` ETA response rate: ${responseRate}%.`
+      return [
+        c.carrier_id, `"${c.carrier_name}"`, c.reliability_score, rating,
+        c.flagged_unreliable ? 'Yes' : 'No', c.total_deliveries, c.on_time_deliveries, c.late_deliveries,
+        onTimeRate, c.avg_delay_hours, c.total_eta_requests, c.eta_responses_received,
+        responseRate, c.avg_response_time_hours ?? 'N/A', `"${trend}"`, `"${summary}"`
+      ]
+    })
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `carrier-intelligence-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+  }
+
+  const exportSitesCsv = () => {
+    if (!intelligenceData?.sites?.length) return
+    const headers = [
+      'Site ID', 'Site Code', 'Site Name', 'Risk Score', 'Risk Rating',
+      'Total Escalations', 'False Alarms', 'False Alarm Rate (%)',
+      'Real Escalations', 'Total Deliveries', 'Avg Daily Consumption (gal)',
+      'Recent Events', 'Summary'
+    ]
+    const rows = intelligenceData.sites.map(s => {
+      const riskRating = s.risk_score >= 0.7 ? 'High Risk'
+        : s.risk_score >= 0.4 ? 'Medium Risk' : 'Low Risk'
+      const falseAlarmPct = s.total_escalations > 0
+        ? (s.false_alarm_rate * 100).toFixed(1) : 'N/A'
+      const realEsc = s.total_escalations - s.false_alarm_count
+      const recentEvents = (s.recent_events || []).slice(-3).map(e => e.details).join('; ') || 'No recent events'
+      let summary = `${s.site_code}: ${riskRating} (${(s.risk_score * 100).toFixed(0)}%).`
+      if (s.total_escalations > 0) summary += ` ${s.total_escalations} escalations, ${s.false_alarm_count} false alarms.`
+      summary += ` ${s.total_deliveries} deliveries received.`
+      return [
+        s.site_id, `"${s.site_code}"`, `"${s.site_name || ''}"`, s.risk_score, riskRating,
+        s.total_escalations, s.false_alarm_count, falseAlarmPct,
+        realEsc, s.total_deliveries, s.avg_daily_consumption ?? 'N/A',
+        `"${recentEvents}"`, `"${summary}"`
+      ]
+    })
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `site-intelligence-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+  }
+
   const assignSiteMutation = useMutation({
     mutationFn: async ({ siteId, agentId }) => {
       const response = await fetch(`/api/sites/${siteId}`, {
@@ -3802,14 +3883,32 @@ function Dashboard({ user, onLogout }) {
                   <h3 className="text-base font-semibold text-slate-800">Knowledge Graph</h3>
                   <span className="text-xs text-slate-500">Passive intelligence from operational data — zero LLM tokens</span>
                 </div>
-                <button
-                  onClick={() => refreshKgMutation.mutate()}
-                  disabled={refreshKgMutation.isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${refreshKgMutation.isPending ? 'animate-spin' : ''}`} />
-                  {refreshKgMutation.isPending ? 'Rebuilding...' : 'Rebuild from data'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={exportCarriersCsv}
+                    disabled={!intelligenceData?.carriers?.length}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Carriers CSV
+                  </button>
+                  <button
+                    onClick={exportSitesCsv}
+                    disabled={!intelligenceData?.sites?.length}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Sites CSV
+                  </button>
+                  <button
+                    onClick={() => refreshKgMutation.mutate()}
+                    disabled={refreshKgMutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${refreshKgMutation.isPending ? 'animate-spin' : ''}`} />
+                    {refreshKgMutation.isPending ? 'Rebuilding...' : 'Rebuild from data'}
+                  </button>
+                </div>
               </div>
 
               {refreshKgMutation.data && (
@@ -3984,6 +4083,37 @@ function Dashboard({ user, onLogout }) {
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Full Knowledge Graph Summary */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-slate-600" />
+                  <h4 className="text-sm font-semibold text-slate-800">Knowledge Graph Summary</h4>
+                  <span className="text-xs text-slate-500">Full narrative analysis — zero LLM tokens</span>
+                </div>
+                <button
+                  onClick={() => kgSummaryMutation.mutate()}
+                  disabled={kgSummaryMutation.isPending || (!intelligenceData?.carriers?.length && !intelligenceData?.sites?.length)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 transition"
+                >
+                  {kgSummaryMutation.isPending ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5" />
+                  )}
+                  Generate Full Summary
+                </button>
+              </div>
+              {kgFullSummary && (
+                <div className="mt-3 bg-slate-50 rounded-lg p-4 border border-slate-100 max-h-96 overflow-y-auto">
+                  <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{kgFullSummary}</pre>
+                  <div className="mt-2 text-[11px] text-slate-400 text-right">
+                    Generated from full knowledge graph data
                   </div>
                 </div>
               )}

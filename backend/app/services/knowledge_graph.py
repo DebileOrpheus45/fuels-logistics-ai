@@ -533,6 +533,141 @@ def generate_status_summary() -> str:
         db.close()
 
 
+def generate_knowledge_graph_summary() -> str:
+    """
+    Generate a comprehensive narrative summary covering every carrier and site
+    in the knowledge graph. Pure template — zero LLM tokens.
+    """
+    db = SessionLocal()
+    try:
+        carriers = db.query(CarrierStats).all()
+        sites = db.query(SiteStats).all()
+
+        now = datetime.utcnow().strftime("%b %d, %Y %H:%M UTC")
+        lines = [f"# Knowledge Graph Intelligence Report", f"Generated: {now}", ""]
+
+        # ── Overview ──
+        total_carriers = len(carriers)
+        total_sites = len(sites)
+        flagged_count = sum(1 for c in carriers if c.flagged_unreliable)
+        high_risk_count = sum(1 for s in sites if s.risk_score >= 0.7)
+        total_deliveries = sum(c.total_deliveries for c in carriers)
+        total_late = sum(c.late_deliveries for c in carriers)
+        overall_on_time = ((total_deliveries - total_late) / max(total_deliveries, 1)) * 100
+
+        lines.append("## Overview")
+        lines.append(f"Tracking {total_carriers} carrier(s) and {total_sites} site(s).")
+        lines.append(f"Total deliveries recorded: {total_deliveries} ({overall_on_time:.1f}% on-time fleet-wide).")
+        if flagged_count > 0:
+            lines.append(f"{flagged_count} carrier(s) flagged as unreliable.")
+        if high_risk_count > 0:
+            lines.append(f"{high_risk_count} site(s) classified as high risk.")
+        if flagged_count == 0 and high_risk_count == 0:
+            lines.append("No carriers flagged and no high-risk sites detected.")
+        lines.append("")
+
+        # ── Carrier Profiles ──
+        lines.append("## Carrier Reliability Profiles")
+        if not carriers:
+            lines.append("No carrier data available.")
+        else:
+            sorted_carriers = sorted(carriers, key=lambda c: c.reliability_score)
+            for cs in sorted_carriers:
+                carrier = db.query(Carrier).filter(Carrier.id == cs.carrier_id).first()
+                if not carrier:
+                    continue
+                name = carrier.carrier_name
+                score_pct = f"{cs.reliability_score * 100:.0f}%"
+
+                if cs.reliability_score >= 0.7:
+                    rating = "Reliable"
+                elif cs.reliability_score >= 0.4:
+                    rating = "At Risk"
+                else:
+                    rating = "Unreliable"
+
+                on_time_rate = (cs.on_time_deliveries / max(cs.total_deliveries, 1)) * 100
+
+                lines.append(f"### {name} — {rating} ({score_pct})")
+                lines.append(f"- {cs.total_deliveries} deliveries: {cs.on_time_deliveries} on-time, {cs.late_deliveries} late ({on_time_rate:.1f}% on-time rate)")
+
+                if cs.avg_delay_hours > 0:
+                    lines.append(f"- When late, average delay: {cs.avg_delay_hours:.1f}h (worst: {cs.worst_delay_hours:.1f}h)")
+
+                if cs.total_eta_requests > 0:
+                    resp_rate = (cs.eta_responses_received / cs.total_eta_requests) * 100
+                    resp_time = f", avg response time {cs.avg_response_time_hours:.1f}h" if cs.avg_response_time_hours else ""
+                    lines.append(f"- ETA responsiveness: {cs.eta_responses_received}/{cs.total_eta_requests} requests answered ({resp_rate:.0f}%{resp_time})")
+
+                recent = cs.recent_deliveries or []
+                if recent:
+                    recent_on_time = sum(1 for d in recent if d.get("on_time"))
+                    recent_total = len(recent)
+                    trend_dir = "improving" if recent_on_time >= recent_total * 0.7 else (
+                        "declining" if recent_on_time < recent_total * 0.4 else "mixed"
+                    )
+                    lines.append(f"- Recent trend ({recent_total} deliveries): {recent_on_time} on-time — {trend_dir}")
+
+                if cs.flagged_unreliable:
+                    lines.append(f"- **FLAGGED**: Unreliable performance — receives Tier 2 scrutiny.")
+                lines.append("")
+
+        # ── Site Profiles ──
+        lines.append("## Site Risk Profiles")
+        if not sites:
+            lines.append("No site data available.")
+        else:
+            sorted_sites = sorted(sites, key=lambda s: s.risk_score, reverse=True)
+            for ss in sorted_sites:
+                site = db.query(Site).filter(Site.id == ss.site_id).first()
+                if not site:
+                    continue
+                code = site.consignee_code
+                name = site.consignee_name or ""
+                risk_pct = f"{ss.risk_score * 100:.0f}%"
+
+                if ss.risk_score >= 0.7:
+                    risk_label = "High Risk"
+                elif ss.risk_score >= 0.4:
+                    risk_label = "Medium Risk"
+                else:
+                    risk_label = "Low Risk"
+
+                lines.append(f"### {code} ({name}) — {risk_label} ({risk_pct})")
+                lines.append(f"- {ss.total_deliveries_received} deliveries received")
+
+                if ss.total_escalations > 0:
+                    real_count = ss.total_escalations - ss.false_alarm_count
+                    lines.append(f"- {ss.total_escalations} escalation(s): {real_count} real issues, {ss.false_alarm_count} false alarms ({ss.false_alarm_rate * 100:.0f}% false alarm rate)")
+
+                if ss.avg_daily_consumption:
+                    lines.append(f"- Average daily consumption: {ss.avg_daily_consumption:.0f} gal/day")
+
+                recent_events = ss.recent_events or []
+                if recent_events:
+                    delivery_events = [e for e in recent_events if e.get("type") == "delivery"]
+                    esc_events = [e for e in recent_events if e.get("type") == "escalation_resolved"]
+                    parts = []
+                    if delivery_events:
+                        parts.append(f"{len(delivery_events)} recent deliveries")
+                    if esc_events:
+                        parts.append(f"{len(esc_events)} resolved escalations")
+                    if parts:
+                        lines.append(f"- Recent activity: {', '.join(parts)}")
+
+                if ss.risk_score >= 0.7:
+                    lines.append(f"- **HIGH RISK**: Elevated escalation history. Warrants close monitoring.")
+                lines.append("")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.error(f"[KnowledgeGraph] Full summary failed: {e}")
+        return f"Knowledge graph summary unavailable: {str(e)}"
+    finally:
+        db.close()
+
+
 def get_all_intelligence() -> Dict[str, Any]:
     """Get full knowledge graph summary for the UI."""
     db = SessionLocal()
