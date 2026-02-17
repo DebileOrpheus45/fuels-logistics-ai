@@ -2718,7 +2718,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
             </button>
             {emailAllMutation.isSuccess && (
               <span className="text-xs text-green-600 font-medium">
-                Sent {emailAllMutation.data?.sent_count || 0} emails
+                Sent {emailAllMutation.data?.sent || 0} of {emailAllMutation.data?.total || 0} emails
               </span>
             )}
             {emailAllMutation.isError && (
