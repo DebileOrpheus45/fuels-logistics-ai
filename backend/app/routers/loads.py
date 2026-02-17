@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 import logging
+import time
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 import json
@@ -376,6 +377,9 @@ def request_eta_for_all_active_loads(
             "success": result.get("success", False),
             "message": result.get("error") if not result.get("success") else "Sent",
         })
+
+        # Resend free tier: 2 req/s rate limit
+        time.sleep(1)
 
     db.commit()
 
