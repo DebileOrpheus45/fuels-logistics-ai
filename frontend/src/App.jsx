@@ -2118,7 +2118,7 @@ function AgentManagementPanel({ agents, sites }) {
 }
 
 // ============== Load Details Sidebar ==============
-function LoadDetailsSidebar({ load: initialLoad, onClose }) {
+function LoadDetailsSidebar({ load: initialLoad, onClose, user }) {
   if (!initialLoad) return null
 
   // Fetch fresh data via API client (uses auth token + correct base URL)
@@ -2136,6 +2136,29 @@ function LoadDetailsSidebar({ load: initialLoad, onClose }) {
   }, [initialLoad.id])
 
   const load = freshLoad
+
+  // Notes form
+  const queryClient = useQueryClient()
+  const [sidebarNoteText, setSidebarNoteText] = useState('')
+
+  const sidebarAddNoteMutation = useMutation({
+    mutationFn: ({ loadId, text, author }) => addNoteToLoad(loadId, text, author, 'human'),
+    onSuccess: (updatedLoad) => {
+      setFreshLoad(updatedLoad)
+      queryClient.invalidateQueries(['active-loads'])
+      setSidebarNoteText('')
+    }
+  })
+
+  const handleSidebarAddNote = () => {
+    if (!sidebarNoteText.trim()) return
+    const authorName = user?.name || user?.username || 'Unknown'
+    sidebarAddNoteMutation.mutate({
+      loadId: load.id,
+      text: sidebarNoteText,
+      author: authorName
+    })
+  }
 
   // Debug: Log tracking data
   useEffect(() => {
@@ -2187,6 +2210,54 @@ function LoadDetailsSidebar({ load: initialLoad, onClose }) {
 
   // Create route line from tracking points
   const routeLine = load.tracking_points?.map(p => [p.lat, p.lng]) || []
+
+  // OSRM road-following route
+  const [osrmRoute, setOsrmRoute] = useState(null)
+  const [routeLoading, setRouteLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchRoute = async () => {
+      const points = load.tracking_points
+      if (!points || points.length < 2) return
+
+      setRouteLoading(true)
+      try {
+        // Subsample to max 25 waypoints to stay within OSRM demo limits
+        let waypoints = points
+        if (points.length > 25) {
+          const step = (points.length - 1) / 24
+          waypoints = Array.from({ length: 25 }, (_, i) =>
+            points[Math.round(i * step)]
+          )
+        }
+
+        // OSRM expects lng,lat order
+        const coords = waypoints.map(p => `${p.lng},${p.lat}`).join(';')
+        const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
+
+        const response = await fetch(url)
+        const data = await response.json()
+
+        if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates) {
+          // Convert from OSRM [lng, lat] to Leaflet [lat, lng]
+          const routeCoords = data.routes[0].geometry.coordinates.map(
+            ([lng, lat]) => [lat, lng]
+          )
+          setOsrmRoute(routeCoords)
+        } else {
+          setOsrmRoute(null)
+        }
+      } catch (err) {
+        console.error('Failed to fetch OSRM route:', err)
+        setOsrmRoute(null)
+      } finally {
+        setRouteLoading(false)
+      }
+    }
+
+    setOsrmRoute(null)
+    fetchRoute()
+  }, [load.id, load.tracking_points?.length])
 
   return (
     <>
@@ -2263,6 +2334,9 @@ function LoadDetailsSidebar({ load: initialLoad, onClose }) {
               <h3 className="font-bold text-gray-900 flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-green-600" />
                 Route Tracking {load.tracking_points?.length > 0 && `(${load.tracking_points.length} points)`}
+                {routeLoading && (
+                  <span className="text-xs text-blue-500 font-normal animate-pulse">Loading route...</span>
+                )}
               </h3>
             </div>
             {load.tracking_points?.length > 0 ? (
@@ -2279,10 +2353,12 @@ function LoadDetailsSidebar({ load: initialLoad, onClose }) {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   />
 
-                  {/* Route line */}
-                  {routeLine.length > 0 && (
-                    <Polyline positions={routeLine} color="blue" weight={3} opacity={0.7} />
-                  )}
+                  {/* Road-following route (OSRM) or fallback straight line */}
+                  {osrmRoute ? (
+                    <Polyline positions={osrmRoute} color="#2563eb" weight={4} opacity={0.8} />
+                  ) : routeLine.length > 0 ? (
+                    <Polyline positions={routeLine} color="blue" weight={3} opacity={0.7} dashArray="8 6" />
+                  ) : null}
 
                   {/* Tracking points */}
                   {load.tracking_points.map((point, idx) => (
@@ -2441,9 +2517,28 @@ function LoadDetailsSidebar({ load: initialLoad, onClose }) {
                 <div className="text-center py-8 text-gray-400">
                   <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">No notes yet</p>
-                  <p className="text-xs mt-1">Add notes from the table view</p>
+                  <p className="text-xs mt-1">Use the form below to add the first note</p>
                 </div>
               )}
+            </div>
+            {/* Add Note Form */}
+            <div className="mt-3 flex gap-2">
+              <input
+                type="text"
+                placeholder="Add a note..."
+                value={sidebarNoteText}
+                onChange={(e) => setSidebarNoteText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSidebarAddNote()}
+                className="flex-1 px-3 py-2 border border-purple-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 placeholder-gray-400"
+              />
+              <button
+                onClick={handleSidebarAddNote}
+                disabled={!sidebarNoteText.trim() || sidebarAddNoteMutation.isPending}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition flex items-center gap-1"
+              >
+                <Send className="h-4 w-4" />
+                Add
+              </button>
             </div>
           </div>
 
@@ -2499,7 +2594,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
   const addNoteMutation = useMutation({
     mutationFn: ({ loadId, text, author }) => addNoteToLoad(loadId, text, author, 'human'),
     onSuccess: () => {
-      queryClient.invalidateQueries(['loads'])
+      queryClient.invalidateQueries(['active-loads'])
       setNoteText('')
       setNoteAuthor('')
     }
@@ -2512,7 +2607,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
     },
     onSuccess: (data, loadId) => {
       console.log('[Email] Success for load', loadId, data)
-      queryClient.invalidateQueries(['loads'])
+      queryClient.invalidateQueries(['active-loads'])
     },
     onError: (err, loadId) => {
       console.error('[Email] Failed for load', loadId, err?.response?.data || err.message)
@@ -2526,7 +2621,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
     },
     onSuccess: (data) => {
       console.log('[Email] Mass email result:', data)
-      queryClient.invalidateQueries(['loads'])
+      queryClient.invalidateQueries(['active-loads'])
     },
     onError: (err) => {
       console.error('[Email] Mass email failed:', err?.response?.data || err.message)
@@ -4208,6 +4303,7 @@ function Dashboard({ user, onLogout }) {
         <LoadDetailsSidebar
           load={selectedLoad}
           onClose={() => setSelectedLoad(null)}
+          user={user}
         />
       )}
     </div>
