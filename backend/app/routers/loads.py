@@ -374,6 +374,7 @@ def request_eta_for_all_active_loads(
             "po_number": load.po_number,
             "carrier": load.carrier.carrier_name,
             "success": result.get("success", False),
+            "message": result.get("error") if not result.get("success") else "Sent",
         })
 
     db.commit()
