@@ -608,6 +608,11 @@ def generate_knowledge_graph_summary() -> str:
                     )
                     lines.append(f"- Recent trend ({recent_total} deliveries): {recent_on_time} on-time — {trend_dir}")
 
+                if cs.primary_dispatcher:
+                    lines.append(f"- Primary contact: {cs.primary_dispatcher} (prefers {cs.communication_preference or 'email'})")
+                if cs.behavioral_notes:
+                    lines.append(f"- Notes: {cs.behavioral_notes}")
+
                 if cs.flagged_unreliable:
                     lines.append(f"- **FLAGGED**: Unreliable performance — receives Tier 2 scrutiny.")
                 lines.append("")
@@ -655,6 +660,13 @@ def generate_knowledge_graph_summary() -> str:
                     if parts:
                         lines.append(f"- Recent activity: {', '.join(parts)}")
 
+                if ss.primary_contact:
+                    lines.append(f"- Primary contact: {ss.primary_contact}")
+                if ss.access_notes:
+                    lines.append(f"- Access: {ss.access_notes}")
+                if ss.operational_notes:
+                    lines.append(f"- Notes: {ss.operational_notes}")
+
                 if ss.risk_score >= 0.7:
                     lines.append(f"- **HIGH RISK**: Elevated escalation history. Warrants close monitoring.")
                 lines.append("")
@@ -692,6 +704,9 @@ def get_all_intelligence() -> Dict[str, Any]:
                     "eta_responses_received": cs.eta_responses_received,
                     "avg_response_time_hours": round(cs.avg_response_time_hours, 1) if cs.avg_response_time_hours else None,
                     "recent_deliveries": cs.recent_deliveries or [],
+                    "primary_dispatcher": cs.primary_dispatcher,
+                    "communication_preference": cs.communication_preference,
+                    "behavioral_notes": cs.behavioral_notes,
                 })
 
         site_data = []
@@ -709,6 +724,9 @@ def get_all_intelligence() -> Dict[str, Any]:
                     "total_deliveries": ss.total_deliveries_received,
                     "avg_daily_consumption": ss.avg_daily_consumption,
                     "recent_events": ss.recent_events or [],
+                    "primary_contact": ss.primary_contact,
+                    "access_notes": ss.access_notes,
+                    "operational_notes": ss.operational_notes,
                 })
 
         return {

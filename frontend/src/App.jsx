@@ -3245,7 +3245,8 @@ function Dashboard({ user, onLogout }) {
       'Carrier ID', 'Carrier Name', 'Reliability Score', 'Rating',
       'Flagged Unreliable', 'Total Deliveries', 'On-Time', 'Late',
       'On-Time Rate (%)', 'Avg Delay (hrs)', 'ETA Requests', 'ETA Responses',
-      'Response Rate (%)', 'Avg Response Time (hrs)', 'Recent Trend', 'Summary'
+      'Response Rate (%)', 'Avg Response Time (hrs)', 'Primary Dispatcher',
+      'Comm Preference', 'Behavioral Notes', 'Recent Trend', 'Summary'
     ]
     const rows = intelligenceData.carriers.map(c => {
       const onTimeRate = c.total_deliveries > 0
@@ -3261,11 +3262,14 @@ function Dashboard({ user, onLogout }) {
       let summary = `${c.carrier_name}: ${rating} with ${onTimeRate}% on-time rate across ${c.total_deliveries} deliveries.`
       if (c.avg_delay_hours > 0) summary += ` Avg delay when late: ${c.avg_delay_hours}h.`
       if (c.total_eta_requests > 0) summary += ` ETA response rate: ${responseRate}%.`
+      if (c.behavioral_notes) summary += ` ${c.behavioral_notes}`
       return [
         c.carrier_id, `"${c.carrier_name}"`, c.reliability_score, rating,
         c.flagged_unreliable ? 'Yes' : 'No', c.total_deliveries, c.on_time_deliveries, c.late_deliveries,
         onTimeRate, c.avg_delay_hours, c.total_eta_requests, c.eta_responses_received,
-        responseRate, c.avg_response_time_hours ?? 'N/A', `"${trend}"`, `"${summary}"`
+        responseRate, c.avg_response_time_hours ?? 'N/A',
+        `"${c.primary_dispatcher || ''}"`, `"${c.communication_preference || ''}"`,
+        `"${c.behavioral_notes || ''}"`, `"${trend}"`, `"${summary}"`
       ]
     })
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
@@ -3283,6 +3287,7 @@ function Dashboard({ user, onLogout }) {
       'Site ID', 'Site Code', 'Site Name', 'Risk Score', 'Risk Rating',
       'Total Escalations', 'False Alarms', 'False Alarm Rate (%)',
       'Real Escalations', 'Total Deliveries', 'Avg Daily Consumption (gal)',
+      'Primary Contact', 'Access Notes', 'Operational Notes',
       'Recent Events', 'Summary'
     ]
     const rows = intelligenceData.sites.map(s => {
@@ -3295,11 +3300,13 @@ function Dashboard({ user, onLogout }) {
       let summary = `${s.site_code}: ${riskRating} (${(s.risk_score * 100).toFixed(0)}%).`
       if (s.total_escalations > 0) summary += ` ${s.total_escalations} escalations, ${s.false_alarm_count} false alarms.`
       summary += ` ${s.total_deliveries} deliveries received.`
+      if (s.operational_notes) summary += ` ${s.operational_notes}`
       return [
         s.site_id, `"${s.site_code}"`, `"${s.site_name || ''}"`, s.risk_score, riskRating,
         s.total_escalations, s.false_alarm_count, falseAlarmPct,
         realEsc, s.total_deliveries, s.avg_daily_consumption ?? 'N/A',
-        `"${recentEvents}"`, `"${summary}"`
+        `"${s.primary_contact || ''}"`, `"${s.access_notes || ''}"`,
+        `"${s.operational_notes || ''}"`, `"${recentEvents}"`, `"${summary}"`
       ]
     })
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n')

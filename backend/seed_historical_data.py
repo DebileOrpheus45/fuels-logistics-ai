@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from app.database import SessionLocal, engine, Base
 from app.models import (
     Site, Carrier, Lane, Load, AIAgent, Escalation,
+    CarrierStats, SiteStats,
     LoadStatus, IssueType, EscalationPriority, EscalationStatus,
 )
 
@@ -237,6 +238,78 @@ def seed_historical_data():
         from app.services.knowledge_graph import rebuild_knowledge_graph
         result = rebuild_knowledge_graph()
         print(f"Knowledge graph rebuilt: {result}")
+
+        # --- Seed qualitative intelligence ---
+        print("\nSeeding qualitative intelligence...")
+
+        # Carrier qualitative data: {carrier_name: (dispatcher, comm_pref, notes)}
+        carrier_qualitative = {
+            "Summit Petroleum Logistics": (
+                "Mike Reynolds",
+                "email",
+                "Slow to respond, especially late in the day. Usually needs a follow-up if no reply within 2 hours. Reliable once confirmed.",
+            ),
+            "Nationwide Fuel Transport": (
+                "Sarah Chen",
+                "phone",
+                "Very responsive by phone, prefers calls over email. Will text ETA updates proactively. Best carrier for urgent loads.",
+            ),
+            "American Energy Carriers": (
+                "dispatch pool (no single contact)",
+                "email",
+                "Rotates dispatchers frequently. Email is only reliable channel. Occasionally misses ETA requests — check spam folder on their end.",
+            ),
+        }
+
+        for carrier in carriers:
+            qual = carrier_qualitative.get(carrier.carrier_name)
+            if qual:
+                cs = db.query(CarrierStats).filter(CarrierStats.carrier_id == carrier.id).first()
+                if cs:
+                    cs.primary_dispatcher = qual[0]
+                    cs.communication_preference = qual[1]
+                    cs.behavioral_notes = qual[2]
+
+        # Site qualitative data: {consignee_code: (contact, access, notes)}
+        site_qualitative = {
+            "ATL-001": (
+                "James (gate guard)",
+                "Standard access, 24/7 delivery",
+                "High-volume site, consistent daily consumption. Prefers morning deliveries before 10 AM.",
+            ),
+            "DFW-042": (
+                "Maria Lopez (site mgr)",
+                "Gated facility, call ahead 30 min",
+                "Weekend consumption spikes due to generator usage. Tuesday is typical low day.",
+            ),
+            "HOU-003": (
+                "Tony (night shift lead)",
+                "Restricted hours: 6AM-10PM only",
+                "Critical site with thin inventory buffer. Escalations here are usually real, not false alarms.",
+            ),
+            "LAX-004": (
+                "Front desk (no dedicated contact)",
+                "Wide access, any truck size",
+                "Large tank capacity means lower delivery frequency. Low-maintenance site.",
+            ),
+            "CHI-005": (
+                "Dave Patterson (ops mgr)",
+                "Winter access issues — salt trucks first",
+                "Consumption varies heavily with weather. At-risk status usually weather-driven, not supply-driven.",
+            ),
+        }
+
+        for site in sites:
+            qual = site_qualitative.get(site.consignee_code)
+            if qual:
+                ss = db.query(SiteStats).filter(SiteStats.site_id == site.id).first()
+                if ss:
+                    ss.primary_contact = qual[0]
+                    ss.access_notes = qual[1]
+                    ss.operational_notes = qual[2]
+
+        db.commit()
+        print(f"Qualitative data seeded for {len(carrier_qualitative)} carriers and {len(site_qualitative)} sites")
 
         # Print summary
         print("\n--- Historical Data Summary ---")

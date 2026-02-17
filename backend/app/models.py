@@ -440,6 +440,11 @@ class CarrierStats(Base):
     reliability_score = Column(Float, default=0.5)  # 0-1, computed from stats
     flagged_unreliable = Column(Boolean, default=False)
 
+    # Qualitative intelligence
+    primary_dispatcher = Column(String, nullable=True)  # e.g. "Mike Reynolds"
+    communication_preference = Column(String, nullable=True)  # e.g. "email", "phone", "text"
+    behavioral_notes = Column(String, nullable=True)  # Free text observations
+
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
@@ -474,6 +479,11 @@ class SiteStats(Base):
 
     # Recent history (last 10 events as JSON)
     recent_events = Column(JSON, default=list)  # [{type: "delivery"|"escalation"|"runout", date: str, details: str}]
+
+    # Qualitative intelligence
+    primary_contact = Column(String, nullable=True)  # e.g. "James at the front gate"
+    access_notes = Column(String, nullable=True)  # e.g. "Tight access road, requires small tankers"
+    operational_notes = Column(String, nullable=True)  # Free text observations
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
