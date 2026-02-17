@@ -61,11 +61,16 @@ def _send_email(
 
         from_field = f"{config['from_name']} <{config['from_email']}>"
 
+        # reply_to → Gmail so carrier replies land in IMAP poller inbox
+        settings = get_settings()
+        reply_to_addr = settings.gmail_user or config["from_email"]
+
         params: dict = {
             "from": from_field,
             "to": [to_email],
             "subject": subject,
             "text": body,
+            "reply_to": reply_to_addr,
         }
         if cc:
             params["cc"] = [cc]
@@ -248,7 +253,7 @@ def send_eta_request(
         f"Fuels Logistics AI Coordinator\n\n"
         f"---\n"
         f"This is an automated message.\n"
-        f"Reply to: {config['from_email']}"
+        f"Reply to: {get_settings().gmail_user or config['from_email']}"
     )
 
     # Create email log entry
