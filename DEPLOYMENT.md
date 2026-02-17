@@ -45,7 +45,11 @@ All outbound emails use **Resend HTTP API**. Railway blocks outbound SMTP (ports
    - `RESEND_FROM_NAME` = display name (optional)
 
 ### Gmail IMAP (Inbound Only)
-Gmail credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) are only used for the **email poller** that reads inbound carrier replies via IMAP. They are NOT used for sending.
+Gmail credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) are used for the **email poller** that reads inbound carrier replies via IMAP. They are NOT used for sending.
+
+The email poller now starts automatically as a **background thread** inside the FastAPI process on startup. No separate service or Procfile worker needed. It checks Gmail every 2 minutes for unread ETA replies and processes them via the `/api/email/inbound` endpoint.
+
+If `GMAIL_USER` or `GMAIL_APP_PASSWORD` are not set, the poller is silently disabled — everything else works normally.
 
 ## Deployment Errors & Fixes
 
@@ -102,6 +106,13 @@ Gmail credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) are only used for the **e
 **Root cause**: Railway intentionally blocks outbound SMTP on Hobby plan to prevent spam. Only Pro plan ($20/mo) unblocks SMTP.
 
 **Fix**: Consolidated all email sending to Resend HTTP API. Removed Gmail SMTP, Gmail OAuth API, SendGrid, and mock email code paths. Single email service at `app/services/email_service.py`.
+
+### 11. Email poller only running locally, not on Railway
+**Error**: Carrier email replies were only processed when the local machine was powered on. Replies sent overnight sat unprocessed until morning.
+
+**Root cause**: The email poller (`start_email_poller.py`) was a standalone process that had to be run manually. It was not included in the Dockerfile, Procfile, or the FastAPI lifespan — so it never ran on Railway.
+
+**Fix**: Integrated the poller as a background daemon thread in the FastAPI lifespan (`main.py`). It now starts automatically when the backend boots on Railway. Uses `threading.Event` for graceful shutdown. `api_base_url` uses `PORT` env var (Railway-assigned) instead of hardcoded `8000`.
 
 ## Auto-Seed Behavior
 

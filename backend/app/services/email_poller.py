@@ -15,7 +15,9 @@ Usage:
 import imaplib
 import email
 from email.header import decode_header
+import os
 import time
+import threading
 import requests
 from datetime import datetime
 import re
@@ -249,16 +251,26 @@ class GmailETAPoller:
             logger.error(f"Error checking inbox: {e}")
             return 0
 
-    def run(self):
-        """Run the polling loop continuously."""
+    def run(self, stop_event: Optional[threading.Event] = None):
+        """Run the polling loop continuously.
+
+        Args:
+            stop_event: Optional threading.Event for graceful shutdown.
+        """
         logger.info(f"Starting Gmail ETA poller (checking every {self.check_interval} seconds)...")
 
         while True:
+            if stop_event and stop_event.is_set():
+                break
+
             try:
                 # Connect fresh for each check (prevents stale connection SSL errors)
                 if not self.connect():
                     logger.error("Failed to connect, retrying in 60 seconds...")
-                    time.sleep(60)
+                    if stop_event:
+                        stop_event.wait(60)
+                    else:
+                        time.sleep(60)
                     continue
 
                 # Check inbox
@@ -270,7 +282,10 @@ class GmailETAPoller:
 
                 # Wait for next check
                 logger.debug(f"Sleeping for {self.check_interval} seconds...")
-                time.sleep(self.check_interval)
+                if stop_event:
+                    stop_event.wait(self.check_interval)
+                else:
+                    time.sleep(self.check_interval)
 
             except KeyboardInterrupt:
                 logger.info("Received shutdown signal, stopping poller...")
@@ -280,16 +295,71 @@ class GmailETAPoller:
                 # Disconnect and reconnect on next iteration
                 self.disconnect()
                 self.imap = None
-                time.sleep(60)
+                if stop_event:
+                    stop_event.wait(60)
+                else:
+                    time.sleep(60)
 
         # Cleanup
         self.disconnect()
         logger.info("Gmail ETA poller stopped")
 
 
+# ---------------------------------------------------------------------------
+# Background thread management — used by FastAPI lifespan in main.py
+# ---------------------------------------------------------------------------
+
+_poller_thread: Optional[threading.Thread] = None
+_stop_event: Optional[threading.Event] = None
+
+
+def start_poller_thread():
+    """Start the email poller in a daemon thread.
+
+    Called from FastAPI lifespan so it runs automatically on Railway.
+    Skips silently if Gmail credentials are not configured.
+    """
+    global _poller_thread, _stop_event
+
+    settings = get_settings()
+    if not settings.gmail_user or not settings.gmail_app_password:
+        logger.info("Gmail credentials not configured — email poller disabled")
+        return
+
+    port = os.environ.get("PORT", "8000")
+    _stop_event = threading.Event()
+
+    poller = GmailETAPoller(
+        email_address=settings.gmail_user,
+        password=settings.gmail_app_password,
+        check_interval=120,  # 2 minutes — good balance for production
+        api_base_url=f"http://localhost:{port}",
+    )
+
+    _poller_thread = threading.Thread(
+        target=poller.run,
+        args=(_stop_event,),
+        daemon=True,
+        name="email-poller",
+    )
+    _poller_thread.start()
+    logger.info(f"Email poller thread started (interval=120s, api=localhost:{port})")
+
+
+def stop_poller_thread():
+    """Signal the poller thread to stop gracefully."""
+    global _stop_event
+    if _stop_event:
+        _stop_event.set()
+        logger.info("Email poller thread stop signal sent")
+
+
+# ---------------------------------------------------------------------------
+# Standalone entry point — for running outside FastAPI (dev, debugging)
+# ---------------------------------------------------------------------------
+
 def main():
     """Main entry point for running the poller as a standalone service."""
-    # Load credentials from settings
     settings = get_settings()
     email_address = settings.gmail_user
     password = settings.gmail_app_password
@@ -299,12 +369,12 @@ def main():
         logger.error("Required variables: GMAIL_USER, GMAIL_APP_PASSWORD")
         return
 
-    # Create and run poller
+    port = os.environ.get("PORT", "8000")
     poller = GmailETAPoller(
         email_address=email_address,
         password=password,
         check_interval=30,  # 30 seconds for responsive polling
-        api_base_url="http://localhost:8000"
+        api_base_url=f"http://localhost:{port}",
     )
 
     poller.run()

@@ -56,10 +56,15 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     logger.info("agent_scheduler_started")
 
+    # Start email poller background thread (auto-skips if Gmail creds missing)
+    from app.services.email_poller import start_poller_thread, stop_poller_thread
+    start_poller_thread()
+
     yield
 
     # Shutdown
     logger.info("application_shutdown")
+    stop_poller_thread()
     stop_scheduler()
 
 

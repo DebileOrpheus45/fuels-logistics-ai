@@ -47,15 +47,13 @@ npm run dev
 - `admin / admin123` (Admin role)
 - `coordinator / fuel2024` (Operator role)
 
-### Optional: Email Integration
+### Email Integration
 
-To enable automated ETA email polling from carriers:
+**Outbound:** Resend HTTP API sends ETA requests to carriers (set `RESEND_API_KEY` in `.env`).
 
-```bash
-# See EMAIL_POLLER_SETUP.md for detailed setup
-cd backend
-python start_email_poller.py
-```
+**Inbound:** Gmail IMAP poller reads carrier replies and auto-updates load ETAs. The poller starts automatically as a background thread when the backend boots — just set `GMAIL_USER` and `GMAIL_APP_PASSWORD` in `.env`. No separate process needed.
+
+For standalone polling (dev/debug): `cd backend && python start_email_poller.py`
 
 ---
 
@@ -68,7 +66,7 @@ python start_email_poller.py
 | [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | Completed/current/future phases |
 | [ENTERPRISE-READINESS-ROADMAP.md](ENTERPRISE-READINESS-ROADMAP.md) | Production deployment plan (0.4 → 1.0) |
 | [LOAD-TRACKING.md](LOAD-TRACKING.md) | GPS routes, load sidebar, sorting, customer tagging |
-| [GMAIL-SETUP.md](GMAIL-SETUP.md) | Gmail SMTP setup for sending ETA emails |
+| [GMAIL-SETUP.md](GMAIL-SETUP.md) | Resend HTTP API setup for sending ETA emails |
 | [backend/EMAIL_POLLER_SETUP.md](backend/EMAIL_POLLER_SETUP.md) | Gmail IMAP polling for auto-parsing carrier replies |
 | [backend/AUTH-SETUP.md](backend/AUTH-SETUP.md) | JWT authentication, RBAC roles, token management |
 | [INGESTION-ROADMAP.md](INGESTION-ROADMAP.md) | Email automation: completed and planned channels |
@@ -82,8 +80,9 @@ python start_email_poller.py
 - ✅ AI-powered automated ETA requests to carriers
 - ✅ Predictive escalation of runout scenarios
 - ✅ Human-in-the-Loop (HITL) supervision dashboard
-- ✅ Interactive load tracking with GPS route visualization
-- ✅ Gmail IMAP email polling for automated carrier reply processing
+- ✅ Interactive load tracking with road-following route visualization (OSRM)
+- ✅ Collaborative load notes from sidebar pop-out
+- ✅ Gmail IMAP email polling (auto-starts with backend) for carrier reply processing
 - ✅ Excel-style sorting and multi-field search
 - ✅ Customer tagging and filtering
 - ✅ AI agent scheduling and automation
@@ -92,7 +91,8 @@ python start_email_poller.py
 
 ### Intelligence & Automation
 - ✅ Tiered agent architecture (Tier 1 rules engine $0/run + Tier 2 LLM on-demand)
-- ✅ Knowledge graph: carrier reliability scoring, site risk profiles
+- ✅ Knowledge graph: carrier reliability scoring, site risk profiles, qualitative intelligence
+- ✅ Knowledge graph CSV export (carriers + sites) and full narrative summary
 - ✅ Auto-escalation of non-ETA emails (shortages, breakdowns, cancellations)
 - ✅ Executive status summary generator (Agent Monitor)
 - ✅ System Logic page with decision architecture explainer
@@ -170,10 +170,9 @@ This starts backend (port 8000), email poller, and frontend (port 5173) together
 
 **Manual start (alternative):**
 1. Start Docker database: `docker-compose up -d`
-2. Start backend: `cd backend && uvicorn app.main:app --reload`
-3. Start email poller: `cd backend && python start_email_poller.py`
-4. Start frontend: `cd frontend && npm run dev`
-5. Access dashboard at http://localhost:5173
+2. Start backend: `cd backend && uvicorn app.main:app --reload` (email poller auto-starts)
+3. Start frontend: `cd frontend && npm run dev`
+4. Access dashboard at http://localhost:5173
 
 ### Stopping the System
 1. Press `Ctrl+C` in the `start_all.ps1` terminal (stops all services)
@@ -194,7 +193,7 @@ python seed_data.py
 ### How It Works
 - AI agents monitor assigned sites every 15 minutes (configurable)
 - Agents analyze inventory levels, runout times, and active loads
-- Agents send real ETA request emails via Gmail SMTP to carriers
+- Agents send real ETA request emails via Resend HTTP API to carriers
 - Creates escalations for critical inventory situations
 - All actions logged to Activity table + Run History with full decision audit trail
 - Human coordinators supervise via the HITL dashboard
@@ -228,6 +227,16 @@ Proprietary - All rights reserved
 
 ## Recent Updates (February 2026)
 
+**Week 9 - Intelligence & Email Polish:**
+- ✅ **Knowledge Graph Qualitative Intelligence** — Dispatcher names, communication preferences, behavioral notes stored per carrier/site
+- ✅ **Full Narrative Summary** — One-click comprehensive knowledge graph report covering every carrier and site
+- ✅ **CSV Export** — Export carrier and site intelligence as CSV with quantitative + qualitative data
+- ✅ **Sidebar Notes** — Add collaborative notes directly from the load detail pop-out
+- ✅ **Road-Following Routes** — Map route lines follow actual roads via OSRM (with dashed fallback)
+- ✅ **Email Poller Auto-Start** — IMAP poller now runs as background thread on Railway (was only local)
+- ✅ **Resend Migration** — All email sending via Resend HTTP API (Railway SMTP-safe)
+- ✅ **Reply-To Header** — Carrier replies route back to Gmail inbox for IMAP polling loop
+
 **Week 8 - Tiered Agent Intelligence:**
 - ✅ **Tier 1 Rules Engine** - Zero-token threshold checks handle ~90% of routine monitoring (runout detection, stale ETAs, delayed loads)
 - ✅ **Tier 2 LLM Agent** - Claude fires only on ambiguous situations flagged by Tier 1 (unreliable carriers, multi-site risk)
@@ -238,7 +247,7 @@ Proprietary - All rights reserved
 - ✅ **Escalation Filtering** - Open/Resolved toggle on Escalations page
 
 **Week 7 - Email Automation & Agent Audit Trail:**
-- ✅ **Real Gmail ETA Emails** - Agent sends actual ETA request emails via Gmail SMTP to carriers
+- ✅ **Real Gmail ETA Emails** - Agent sends actual ETA request emails via Resend HTTP API to carriers
 - ✅ **Auto-Reply Processing** - Inbound carrier replies parsed by LLM (Claude Haiku) with regex fallback; ETAs auto-updated on loads
 - ✅ **Relative Time Parsing** - "couple hours", "30 minutes out" resolved against email received time
 - ✅ **Agent Run History Recording** - Every run creates an audit record with decisions, emails sent, escalations created
@@ -270,5 +279,5 @@ Proprietary - All rights reserved
 
 ---
 
-**Version:** 0.6.0 (Tiered Agent Intelligence + Knowledge Graph)
-**Last Updated:** February 14, 2026
+**Version:** 0.7.0 (Qualitative Intelligence + Email Polish + Road Routes)
+**Last Updated:** February 15, 2026
