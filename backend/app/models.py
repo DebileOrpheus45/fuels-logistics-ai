@@ -55,6 +55,8 @@ class IssueType(str, enum.Enum):
     DRIVER_ISSUE = "driver_issue"
     DELAYED_SHIPMENT = "delayed_shipment"
     NO_CARRIER_RESPONSE = "no_carrier_response"
+    STALE_INVENTORY = "stale_inventory"
+    STALE_ETA = "stale_eta"
     OTHER = "other"
 
 

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import List, Dict
 from sqlalchemy.orm import Session
 
-from app.models import Site, Load, Escalation, EscalationStatus, EscalationPriority
+from app.models import Site, Load, Escalation, EscalationStatus, EscalationPriority, IssueType
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ class StalenessMonitor:
         # Check if we already have an open escalation for this
         existing = self.db.query(Escalation).filter(
             Escalation.site_id == site.id,
-            Escalation.escalation_type == 'stale_inventory',
+            Escalation.issue_type == IssueType.STALE_INVENTORY,
             Escalation.status == EscalationStatus.OPEN
         ).first()
 
@@ -117,7 +117,7 @@ class StalenessMonitor:
             priority = EscalationPriority.MEDIUM
 
         escalation = Escalation(
-            escalation_type='stale_inventory',
+            issue_type=IssueType.STALE_INVENTORY,
             priority=priority,
             site_id=site.id,
             load_id=None,
@@ -145,7 +145,7 @@ class StalenessMonitor:
         # Check if we already have an open escalation for this
         existing = self.db.query(Escalation).filter(
             Escalation.load_id == load.id,
-            Escalation.escalation_type == 'stale_eta',
+            Escalation.issue_type == IssueType.STALE_ETA,
             Escalation.status == EscalationStatus.OPEN
         ).first()
 
@@ -172,7 +172,7 @@ class StalenessMonitor:
         destination = load.destination_site.consignee_code if load.destination_site else 'Unknown'
 
         escalation = Escalation(
-            escalation_type='stale_eta',
+            issue_type=IssueType.STALE_ETA,
             priority=priority,
             site_id=load.destination_site_id,
             load_id=load.id,
