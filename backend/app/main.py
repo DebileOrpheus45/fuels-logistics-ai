@@ -33,41 +33,42 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("database_initialized")
 
-    # Schema migrations: add new enum values and columns that create_all doesn't handle
+    # One-time schema migrations (skipped if already applied)
     from app.database import SessionLocal
     from sqlalchemy import text
     from app.models import User, Load
     try:
         _db = SessionLocal()
-
-        # Add new enum values
-        for val in ('stale_inventory', 'stale_eta'):
-            try:
-                _db.execute(text(f"ALTER TYPE issuetype ADD VALUE IF NOT EXISTS '{val}'"))
-                _db.commit()
-            except Exception:
-                _db.rollback()
-
-        # Add new columns to existing tables (create_all only creates new tables)
-        new_columns = [
-            ("carrier_stats", "primary_dispatcher", "VARCHAR"),
-            ("carrier_stats", "communication_preference", "VARCHAR"),
-            ("carrier_stats", "behavioral_notes", "VARCHAR"),
-            ("site_stats", "primary_contact", "VARCHAR"),
-            ("site_stats", "access_notes", "VARCHAR"),
-            ("site_stats", "operational_notes", "VARCHAR"),
-        ]
-        for table, column, col_type in new_columns:
-            try:
-                _db.execute(text(
-                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}"
-                ))
-                _db.commit()
-            except Exception:
-                _db.rollback()
-
+        # Quick check: if the last column we added exists, skip all migrations
+        _check = _db.execute(text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='carrier_stats' AND column_name='primary_dispatcher'"
+        )).fetchone()
+        if not _check:
+            logger.info("running_schema_migrations")
+            for val in ('stale_inventory', 'stale_eta'):
+                try:
+                    _db.execute(text(f"ALTER TYPE issuetype ADD VALUE IF NOT EXISTS '{val}'"))
+                    _db.commit()
+                except Exception:
+                    _db.rollback()
+            for table, column, col_type in [
+                ("carrier_stats", "primary_dispatcher", "VARCHAR"),
+                ("carrier_stats", "communication_preference", "VARCHAR"),
+                ("carrier_stats", "behavioral_notes", "VARCHAR"),
+                ("site_stats", "primary_contact", "VARCHAR"),
+                ("site_stats", "access_notes", "VARCHAR"),
+                ("site_stats", "operational_notes", "VARCHAR"),
+            ]:
+                try:
+                    _db.execute(text(
+                        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}"
+                    ))
+                    _db.commit()
+                except Exception:
+                    _db.rollback()
+            logger.info("schema_migration_complete")
         _db.close()
-        logger.info("schema_migration_complete")
     except Exception as e:
         logger.warning("schema_migration_skipped", error=str(e))
 
