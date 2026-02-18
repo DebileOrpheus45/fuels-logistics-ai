@@ -1,11 +1,12 @@
 """
-Email endpoints for viewing sent emails (mock implementation).
+Email endpoints for viewing sent emails and controlling the IMAP poller.
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
 from app.services.email_service import email_service
 from app.auth import get_current_user
+from app.models import User
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 
@@ -29,3 +30,33 @@ def get_sent_email_count():
     return {
         "count": len(email_service.sent_emails)
     }
+
+
+@router.get("/poller/status")
+def get_poller_status(current_user: User = Depends(get_current_user)):
+    """Get email poller running status."""
+    from app.services.email_poller import _poller_thread, _stop_event
+    running = (
+        _poller_thread is not None
+        and _poller_thread.is_alive()
+        and (_stop_event is None or not _stop_event.is_set())
+    )
+    return {"running": running, "check_interval": 120 if running else None}
+
+
+@router.post("/poller/start")
+def start_poller(current_user: User = Depends(get_current_user)):
+    """Start the email poller background thread."""
+    from app.services.email_poller import _poller_thread, start_poller_thread
+    if _poller_thread and _poller_thread.is_alive():
+        return {"running": True, "message": "Already running"}
+    start_poller_thread()
+    return {"running": True, "message": "Poller started"}
+
+
+@router.post("/poller/stop")
+def stop_poller(current_user: User = Depends(get_current_user)):
+    """Stop the email poller background thread."""
+    from app.services.email_poller import stop_poller_thread
+    stop_poller_thread()
+    return {"running": False, "message": "Stop signal sent"}

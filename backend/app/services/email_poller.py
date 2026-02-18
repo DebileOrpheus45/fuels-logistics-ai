@@ -152,6 +152,14 @@ class GmailETAPoller:
 
         return False
 
+    def extract_email_address(self, raw_from: str) -> str:
+        """Extract bare email address from 'Display Name <email>' format."""
+        match = re.search(r'<([^>]+)>', raw_from)
+        if match:
+            return match.group(1)
+        # Already bare email
+        return raw_from.strip()
+
     def process_email(self, email_id: bytes) -> Optional[Dict]:
         """
         Process a single email and send to API.
@@ -167,7 +175,7 @@ class GmailETAPoller:
 
             # Extract fields
             subject = self.decode_subject(msg.get("Subject", ""))
-            from_email = msg.get("From", "")
+            from_email = self.extract_email_address(msg.get("From", ""))
             message_id = msg.get("Message-ID", "")
             body = self.extract_body(msg)
 
@@ -258,6 +266,13 @@ class GmailETAPoller:
             stop_event: Optional threading.Event for graceful shutdown.
         """
         logger.info(f"Starting Gmail ETA poller (checking every {self.check_interval} seconds)...")
+
+        # Wait for FastAPI server to be ready before first poll
+        if stop_event:
+            logger.info("Waiting 15s for server to be ready...")
+            stop_event.wait(15)
+            if stop_event.is_set():
+                return
 
         while True:
             if stop_event and stop_event.is_set():

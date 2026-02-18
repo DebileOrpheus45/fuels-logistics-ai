@@ -165,8 +165,12 @@ def process_inbound_email(
     auto_reply_type = None
     reply_result = None
 
-    # Loop guard: never reply to ourselves
-    is_self = email.from_email.lower().strip() == settings.resend_from_email.lower().strip()
+    # Loop guard: never reply to ourselves (handle "Name <email>" IMAP format)
+    from_lower = email.from_email.lower().strip()
+    is_self = (
+        settings.resend_from_email.lower() in from_lower
+        or (settings.gmail_user and settings.gmail_user.lower() in from_lower)
+    )
 
     if is_self:
         logger.info(f"Skipping auto-reply: sender is self ({email.from_email})")

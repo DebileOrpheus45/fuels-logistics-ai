@@ -38,7 +38,10 @@ import {
   getStatusSummary,
   getFullKgSummary,
   requestEtaForLoad,
-  requestEtaForAllLoads
+  requestEtaForAllLoads,
+  getPollerStatus,
+  startPoller,
+  stopPoller
 } from './api/client'
 import {
   Fuel,
@@ -92,7 +95,8 @@ import {
   TrendingUp,
   Target,
   Layers,
-  FileText
+  FileText,
+  Power
 } from 'lucide-react'
 
 // ============== Login Page ==============
@@ -1402,6 +1406,18 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   const [expandedRunId, setExpandedRunId] = useState(null)
   const [statusSummary, setStatusSummary] = useState(null)
 
+  // Email poller toggle
+  const { data: pollerStatus } = useQuery({
+    queryKey: ['poller-status'],
+    queryFn: getPollerStatus,
+    refetchInterval: 10000,
+  })
+
+  const pollerToggleMutation = useMutation({
+    mutationFn: (action) => action === 'start' ? startPoller() : stopPoller(),
+    onSuccess: () => queryClient.invalidateQueries(['poller-status']),
+  })
+
   const statusSummaryMutation = useMutation({
     mutationFn: getStatusSummary,
     onSuccess: (data) => setStatusSummary(data.summary)
@@ -1477,6 +1493,43 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
 
   return (
     <div className="space-y-6">
+      {/* Email Poller Control */}
+      <div className="bg-white rounded-lg border border-slate-200 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Mail className="h-5 w-5 text-purple-600" />
+          <div>
+            <span className="font-medium text-slate-800">Email Poller</span>
+            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+              pollerStatus?.running
+                ? 'bg-green-100 text-green-700'
+                : 'bg-slate-100 text-slate-500'
+            }`}>
+              {pollerStatus?.running ? 'Running' : 'Stopped'}
+            </span>
+            {pollerStatus?.running && pollerStatus?.check_interval && (
+              <span className="ml-2 text-xs text-slate-400">
+                every {Math.round(pollerStatus.check_interval / 60)}m
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={() => pollerToggleMutation.mutate(pollerStatus?.running ? 'stop' : 'start')}
+          disabled={pollerToggleMutation.isPending}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+            pollerStatus?.running
+              ? 'bg-red-50 text-red-600 hover:bg-red-100'
+              : 'bg-green-50 text-green-600 hover:bg-green-100'
+          } disabled:opacity-50`}
+        >
+          <Power className="h-4 w-4" />
+          {pollerToggleMutation.isPending
+            ? (pollerStatus?.running ? 'Stopping...' : 'Starting...')
+            : (pollerStatus?.running ? 'Stop' : 'Start')
+          }
+        </button>
+      </div>
+
       {/* Agent Status Strip */}
       <div className="space-y-2">
         {agents?.map(agent => {

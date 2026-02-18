@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 
     # Auto-seed if database has no users (first deploy)
     from app.database import SessionLocal
-    from app.models import User
+    from app.models import User, Load
     try:
         db = SessionLocal()
         if db.query(User).count() == 0:
@@ -47,7 +47,14 @@ async def lifespan(app: FastAPI):
             add_tracking_to_loads()
             logger.info("auto_seed_complete")
         else:
+            # Seed historical data + knowledge graph if not yet present
+            has_historical = db.query(Load).filter(Load.po_number.like("PO-HIST-%")).count() > 0
             db.close()
+            if not has_historical:
+                logger.info("historical_data_missing", action="auto_seeding_historical")
+                from seed_historical_data import seed_historical_data
+                seed_historical_data()
+                logger.info("historical_seed_complete")
     except Exception as e:
         logger.warning("auto_seed_skipped", error=str(e))
 

@@ -138,6 +138,11 @@ export const resolveEscalation = (id, notes) =>
 export const getSentEmails = () => api.get('/emails/sent').then(res => res.data)
 export const getInboundEmails = () => api.get('/email/inbound').then(res => res.data)
 
+// Email Poller
+export const getPollerStatus = () => api.get('/emails/poller/status').then(res => res.data)
+export const startPoller = () => api.post('/emails/poller/start').then(res => res.data)
+export const stopPoller = () => api.post('/emails/poller/stop').then(res => res.data)
+
 // Intelligence / Knowledge Graph
 export const getIntelligence = () => api.get('/intelligence/').then(res => res.data)
 export const refreshKnowledgeGraph = () => api.post('/intelligence/refresh').then(res => res.data)
