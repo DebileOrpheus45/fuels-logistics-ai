@@ -33,9 +33,24 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("database_initialized")
 
-    # Auto-seed if database has no users (first deploy)
+    # Ensure Postgres enums have all values (new values aren't added by create_all)
     from app.database import SessionLocal
+    from sqlalchemy import text
     from app.models import User, Load
+    try:
+        _db = SessionLocal()
+        for val in ('stale_inventory', 'stale_eta'):
+            try:
+                _db.execute(text(f"ALTER TYPE issuetype ADD VALUE IF NOT EXISTS '{val}'"))
+                _db.commit()
+            except Exception:
+                _db.rollback()
+        _db.close()
+        logger.info("enum_migration_complete")
+    except Exception as e:
+        logger.warning("enum_migration_skipped", error=str(e))
+
+    # Auto-seed if database has no users (first deploy)
     try:
         db = SessionLocal()
         if db.query(User).count() == 0:
