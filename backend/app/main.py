@@ -33,22 +33,43 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("database_initialized")
 
-    # Ensure Postgres enums have all values (new values aren't added by create_all)
+    # Schema migrations: add new enum values and columns that create_all doesn't handle
     from app.database import SessionLocal
     from sqlalchemy import text
     from app.models import User, Load
     try:
         _db = SessionLocal()
+
+        # Add new enum values
         for val in ('stale_inventory', 'stale_eta'):
             try:
                 _db.execute(text(f"ALTER TYPE issuetype ADD VALUE IF NOT EXISTS '{val}'"))
                 _db.commit()
             except Exception:
                 _db.rollback()
+
+        # Add new columns to existing tables (create_all only creates new tables)
+        new_columns = [
+            ("carrier_stats", "primary_dispatcher", "VARCHAR"),
+            ("carrier_stats", "communication_preference", "VARCHAR"),
+            ("carrier_stats", "behavioral_notes", "VARCHAR"),
+            ("site_stats", "primary_contact", "VARCHAR"),
+            ("site_stats", "access_notes", "VARCHAR"),
+            ("site_stats", "operational_notes", "VARCHAR"),
+        ]
+        for table, column, col_type in new_columns:
+            try:
+                _db.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}"
+                ))
+                _db.commit()
+            except Exception:
+                _db.rollback()
+
         _db.close()
-        logger.info("enum_migration_complete")
+        logger.info("schema_migration_complete")
     except Exception as e:
-        logger.warning("enum_migration_skipped", error=str(e))
+        logger.warning("schema_migration_skipped", error=str(e))
 
     # Auto-seed if database has no users (first deploy)
     try:
