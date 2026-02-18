@@ -533,6 +533,56 @@ def generate_status_summary() -> str:
         db.close()
 
 
+def generate_llm_status_summary() -> dict:
+    """
+    Generate an LLM-powered executive briefing using Claude Haiku.
+    Falls back to template summary on failure.
+    Returns: {"summary": str, "source": "llm"|"template"}
+    """
+    template_summary = generate_status_summary()
+
+    try:
+        from app.config import get_settings
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            return {"summary": template_summary, "source": "template"}
+
+        from anthropic import Anthropic
+        client = Anthropic(api_key=settings.anthropic_api_key)
+
+        system_prompt = (
+            "You are an operations briefing assistant for a fuel logistics company. "
+            "Given the following operational data, write a concise 3-5 sentence executive briefing. "
+            "Be specific with numbers. Highlight anything that needs immediate attention. "
+            "Be professional but direct. Do not use markdown formatting."
+        )
+
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            system=system_prompt,
+            messages=[{"role": "user", "content": template_summary}],
+        )
+
+        llm_text = response.content[0].text.strip()
+
+        # Record usage
+        try:
+            db = SessionLocal()
+            from app.services.llm_usage import record_llm_usage
+            record_llm_usage(db, "executive_summary", "claude-haiku-4-5-20251001",
+                             response.usage.input_tokens, response.usage.output_tokens)
+            db.close()
+        except Exception:
+            pass
+
+        return {"summary": llm_text, "source": "llm"}
+
+    except Exception as e:
+        logger.warning(f"[KnowledgeGraph] LLM summary failed, using template: {e}")
+        return {"summary": template_summary, "source": "template"}
+
+
 def generate_knowledge_graph_summary() -> str:
     """
     Generate a comprehensive narrative summary covering every carrier and site

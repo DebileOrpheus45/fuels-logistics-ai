@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.models import User
+from app.database import get_db
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 
@@ -32,10 +34,16 @@ def seed_historical(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/status-summary")
-def get_status_summary(current_user: User = Depends(get_current_user)):
-    """Generate executive status summary from current state + knowledge graph."""
+def get_status_summary(
+    llm: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate executive status summary. Use ?llm=true for AI-powered briefing."""
+    if llm:
+        from app.services.knowledge_graph import generate_llm_status_summary
+        return generate_llm_status_summary()
     from app.services.knowledge_graph import generate_status_summary
-    return {"summary": generate_status_summary()}
+    return {"summary": generate_status_summary(), "source": "template"}
 
 
 @router.get("/full-summary")
@@ -43,6 +51,16 @@ def get_full_summary(current_user: User = Depends(get_current_user)):
     """Generate comprehensive knowledge graph narrative summary."""
     from app.services.knowledge_graph import generate_knowledge_graph_summary
     return {"summary": generate_knowledge_graph_summary()}
+
+
+@router.get("/admin/llm-usage")
+def get_llm_usage(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get cumulative LLM usage statistics for the Admin dashboard."""
+    from app.services.llm_usage import get_usage_summary
+    return get_usage_summary(db)
 
 
 @router.get("/carrier/{carrier_id}")

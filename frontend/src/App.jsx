@@ -41,7 +41,9 @@ import {
   requestEtaForAllLoads,
   getPollerStatus,
   startPoller,
-  stopPoller
+  stopPoller,
+  getStatusSummaryLlm,
+  getLlmUsage
 } from './api/client'
 import {
   Fuel,
@@ -1405,6 +1407,7 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   const [showRunHistory, setShowRunHistory] = useState(true)
   const [expandedRunId, setExpandedRunId] = useState(null)
   const [statusSummary, setStatusSummary] = useState(null)
+  const [summarySource, setSummarySource] = useState(null)
 
   // Email poller toggle
   const { data: pollerStatus } = useQuery({
@@ -1419,8 +1422,11 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
   })
 
   const statusSummaryMutation = useMutation({
-    mutationFn: getStatusSummary,
-    onSuccess: (data) => setStatusSummary(data.summary)
+    mutationFn: getStatusSummaryLlm,
+    onSuccess: (data) => {
+      setStatusSummary(data.summary)
+      setSummarySource(data.source)
+    }
   })
 
   // Fetch run history for all agents
@@ -1642,7 +1648,14 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
         {statusSummary && (
           <div className="mt-3 bg-slate-50 rounded-lg p-4 border border-slate-100">
             <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{statusSummary}</pre>
-            <div className="mt-2 text-[11px] text-slate-400 text-right">Generated from live data + knowledge graph</div>
+            <div className="mt-2 flex items-center justify-end gap-2">
+              {summarySource === 'llm' && (
+                <span className="text-[11px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AI</span>
+              )}
+              <span className="text-[11px] text-slate-400">
+                {summarySource === 'llm' ? 'AI-generated briefing' : 'Generated from live data + knowledge graph'}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -3364,6 +3377,13 @@ function Dashboard({ user, onLogout }) {
     enabled: activeTab === 'intelligence',
   })
 
+  const { data: llmUsageData } = useQuery({
+    queryKey: ['llm-usage'],
+    queryFn: getLlmUsage,
+    enabled: activeTab === 'admin',
+    refetchInterval: 30000,
+  })
+
   const resolveMutation = useMutation({
     mutationFn: ({ id, notes }) => resolveEscalation(id, notes),
     onSuccess: () => {
@@ -3673,7 +3693,7 @@ function Dashboard({ user, onLogout }) {
         <div className="flex gap-6">
           {/* Left Sidebar - Tab Navigation */}
           <div className="w-48 flex-shrink-0">
-            <nav className="flex flex-col gap-1 h-[360px]">
+            <nav className="flex flex-col gap-1 h-[400px]">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: Activity },
                 { id: 'sites', label: 'Sites', icon: Fuel },
@@ -3681,7 +3701,8 @@ function Dashboard({ user, onLogout }) {
                 { id: 'agent-monitor', label: 'Agent Monitor', icon: Bot },
                 { id: 'escalations', label: 'Escalations', icon: Bell },
                 { id: 'intelligence', label: 'System Logic', icon: Brain },
-                { id: 'sheets', label: 'Google Sheets', icon: FileSpreadsheet }
+                { id: 'sheets', label: 'Google Sheets', icon: FileSpreadsheet },
+                { id: 'admin', label: 'Admin', icon: Settings }
               ].map(({ id, label, icon: TabIcon }) => (
                 <button
                   key={id}
@@ -4308,6 +4329,104 @@ function Dashboard({ user, onLogout }) {
           <div className="max-w-2xl">
             <h2 className="text-xl font-bold mb-4">Google Sheets Integration</h2>
             <GoogleSheetsPanel sites={sites} loads={loads} />
+          </div>
+        )}
+
+        {/* Admin Tab */}
+        {activeTab === 'admin' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-slate-900">Admin — LLM Usage</h2>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg border border-slate-200 p-5">
+                <div className="text-sm text-slate-500">Total LLM Calls</div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">{llmUsageData?.total_calls || 0}</div>
+              </div>
+              <div className="bg-white rounded-lg border border-slate-200 p-5">
+                <div className="text-sm text-slate-500">Total Tokens</div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">
+                  {((llmUsageData?.total_input_tokens || 0) + (llmUsageData?.total_output_tokens || 0)).toLocaleString()}
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {(llmUsageData?.total_input_tokens || 0).toLocaleString()} in / {(llmUsageData?.total_output_tokens || 0).toLocaleString()} out
+                </div>
+              </div>
+              <div className="bg-white rounded-lg border border-slate-200 p-5">
+                <div className="text-sm text-slate-500">Total Cost</div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">
+                  ${(llmUsageData?.total_cost_usd || 0).toFixed(4)}
+                </div>
+              </div>
+            </div>
+
+            {/* Feature Breakdown */}
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+                <h3 className="text-base font-semibold text-slate-900">Usage by Feature</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left px-5 py-3 text-slate-500 font-medium">Feature</th>
+                    <th className="text-right px-5 py-3 text-slate-500 font-medium">Calls</th>
+                    <th className="text-right px-5 py-3 text-slate-500 font-medium">Input Tokens</th>
+                    <th className="text-right px-5 py-3 text-slate-500 font-medium">Output Tokens</th>
+                    <th className="text-right px-5 py-3 text-slate-500 font-medium">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(llmUsageData?.by_feature || []).map((f) => (
+                    <tr key={f.feature} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="px-5 py-3 font-medium text-slate-800">{f.feature}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">{f.calls}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">{f.input_tokens.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">{f.output_tokens.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">${f.cost_usd.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                  {(!llmUsageData?.by_feature?.length) && (
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400">No LLM usage recorded yet</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Recent Calls */}
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+                <h3 className="text-base font-semibold text-slate-900">Recent LLM Calls</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left px-5 py-3 text-slate-500 font-medium">Time</th>
+                    <th className="text-left px-5 py-3 text-slate-500 font-medium">Feature</th>
+                    <th className="text-left px-5 py-3 text-slate-500 font-medium">Model</th>
+                    <th className="text-right px-5 py-3 text-slate-500 font-medium">Tokens</th>
+                    <th className="text-right px-5 py-3 text-slate-500 font-medium">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(llmUsageData?.recent || []).map((r) => (
+                    <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="px-5 py-3 text-slate-600">
+                        {r.created_at ? new Date(r.created_at).toLocaleString() : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-slate-800">{r.feature}</td>
+                      <td className="px-5 py-3 text-slate-500 text-xs">{r.model}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">
+                        {(r.input_tokens + r.output_tokens).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 text-right text-slate-600">${r.cost_usd.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                  {(!llmUsageData?.recent?.length) && (
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400">No LLM calls recorded yet</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

@@ -147,7 +147,9 @@ export const stopPoller = () => api.post('/emails/poller/stop').then(res => res.
 export const getIntelligence = () => api.get('/intelligence/').then(res => res.data)
 export const refreshKnowledgeGraph = () => api.post('/intelligence/refresh').then(res => res.data)
 export const getStatusSummary = () => api.get('/intelligence/status-summary').then(res => res.data)
+export const getStatusSummaryLlm = () => api.get('/intelligence/status-summary?llm=true').then(res => res.data)
 export const getFullKgSummary = () => api.get('/intelligence/full-summary').then(res => res.data)
+export const getLlmUsage = () => api.get('/intelligence/admin/llm-usage').then(res => res.data)
 
 // Google Sheets
 export const getSheetsStatus = () => api.get('/sheets/status').then(res => res.data)

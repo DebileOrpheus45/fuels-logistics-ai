@@ -49,6 +49,17 @@ class ClaudeService:
 
         response = self.client.messages.create(**kwargs)
 
+        # Record LLM usage
+        try:
+            from app.database import SessionLocal
+            from app.services.llm_usage import record_llm_usage
+            _udb = SessionLocal()
+            record_llm_usage(_udb, "agent_run", self.model,
+                             response.usage.input_tokens, response.usage.output_tokens)
+            _udb.close()
+        except Exception:
+            pass
+
         return {
             "id": response.id,
             "content": response.content,

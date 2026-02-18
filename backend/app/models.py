@@ -541,3 +541,17 @@ class AgentRunHistory(Base):
 
     # Relationships
     agent = relationship("AIAgent", backref="run_history")
+
+
+class LlmUsage(Base):
+    """Tracks every LLM API call for persistent cost monitoring."""
+    __tablename__ = "llm_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    feature = Column(String(100), nullable=False, index=True)  # "executive_summary", "email_parsing", "agent_run"
+    model = Column(String(100), nullable=False)
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

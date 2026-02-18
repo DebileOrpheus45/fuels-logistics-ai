@@ -171,6 +171,17 @@ def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[da
             messages=[{"role": "user", "content": user_msg}],
         )
 
+        # Record LLM usage
+        try:
+            from app.database import SessionLocal
+            from app.services.llm_usage import record_llm_usage
+            _udb = SessionLocal()
+            record_llm_usage(_udb, "email_parsing", "claude-haiku-4-5-20251001",
+                             response.usage.input_tokens, response.usage.output_tokens)
+            _udb.close()
+        except Exception:
+            pass
+
         raw = response.content[0].text.strip()
         logger.info(f"LLM raw response: {raw!r}")
         # Strip markdown fences if present
