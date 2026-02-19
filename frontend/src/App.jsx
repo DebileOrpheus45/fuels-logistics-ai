@@ -3982,6 +3982,7 @@ function Dashboard({ user, onLogout }) {
             {showSidebar && (
               <div className="space-y-6">
                 <AgentManagementPanel agents={agents} sites={sites} />
+                <EmailsPanel emails={emails} inboundEmails={inboundEmails} onViewEmail={setSelectedEmail} />
               </div>
             )}
           </div>
