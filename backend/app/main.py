@@ -144,6 +144,11 @@ app.include_router(email_inbound.router)
 app.include_router(sheets.router)
 app.include_router(intelligence.router)
 
+# Internal admin endpoints — only available in debug mode
+if settings.debug:
+    from app.routers import admin_internal
+    app.include_router(admin_internal.router)
+
 
 @app.get("/")
 def root():
