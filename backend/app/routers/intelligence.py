@@ -47,10 +47,16 @@ def get_status_summary(
 
 
 @router.get("/full-summary")
-def get_full_summary(current_user: User = Depends(get_current_user)):
-    """Generate comprehensive knowledge graph narrative summary."""
+def get_full_summary(
+    llm: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate comprehensive knowledge graph summary. Use ?llm=true for AI-powered version."""
+    if llm:
+        from app.services.knowledge_graph import generate_llm_knowledge_graph_summary
+        return generate_llm_knowledge_graph_summary()
     from app.services.knowledge_graph import generate_knowledge_graph_summary
-    return {"summary": generate_knowledge_graph_summary()}
+    return {"summary": generate_knowledge_graph_summary(), "source": "template"}
 
 
 @router.get("/admin/llm-usage")

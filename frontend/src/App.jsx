@@ -37,6 +37,7 @@ import {
   refreshKnowledgeGraph,
   getStatusSummary,
   getFullKgSummary,
+  getFullKgSummaryLlm,
   requestEtaForLoad,
   requestEtaForAllLoads,
   getPollerStatus,
@@ -98,7 +99,8 @@ import {
   Target,
   Layers,
   FileText,
-  Power
+  Power,
+  Sparkles
 } from 'lucide-react'
 
 // ============== Login Page ==============
@@ -3410,10 +3412,14 @@ function Dashboard({ user, onLogout }) {
   })
 
   const [kgFullSummary, setKgFullSummary] = useState(null)
+  const [kgSummarySource, setKgSummarySource] = useState(null)
 
   const kgSummaryMutation = useMutation({
-    mutationFn: getFullKgSummary,
-    onSuccess: (data) => setKgFullSummary(data.summary)
+    mutationFn: getFullKgSummaryLlm,
+    onSuccess: (data) => {
+      setKgFullSummary(data.summary)
+      setKgSummarySource(data.source || 'template')
+    }
   })
 
   const exportCarriersCsv = () => {
@@ -4279,7 +4285,7 @@ function Dashboard({ user, onLogout }) {
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-slate-600" />
                   <h4 className="text-sm font-semibold text-slate-800">Knowledge Graph Summary</h4>
-                  <span className="text-xs text-slate-500">Full narrative analysis — zero LLM tokens</span>
+                  <span className="text-xs text-slate-500">AI-powered intelligence briefing</span>
                 </div>
                 <button
                   onClick={() => kgSummaryMutation.mutate()}
@@ -4297,8 +4303,15 @@ function Dashboard({ user, onLogout }) {
               {kgFullSummary && (
                 <div className="mt-3 bg-slate-50 rounded-lg p-4 border border-slate-100 max-h-96 overflow-y-auto">
                   <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{kgFullSummary}</pre>
-                  <div className="mt-2 text-[11px] text-slate-400 text-right">
-                    Generated from full knowledge graph data
+                  <div className="mt-2 flex items-center justify-end gap-2">
+                    {kgSummarySource === 'llm' && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-semibold">
+                        <Sparkles className="h-2.5 w-2.5" /> AI
+                      </span>
+                    )}
+                    <span className="text-[11px] text-slate-400">
+                      {kgSummarySource === 'llm' ? 'AI-generated intelligence briefing' : 'Generated from knowledge graph data'}
+                    </span>
                   </div>
                 </div>
               )}

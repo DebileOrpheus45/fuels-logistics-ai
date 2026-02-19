@@ -730,6 +730,60 @@ def generate_knowledge_graph_summary() -> str:
         db.close()
 
 
+def generate_llm_knowledge_graph_summary() -> dict:
+    """
+    Generate an LLM-powered knowledge graph intelligence report using Claude Haiku.
+    Falls back to template summary on failure.
+    Returns: {"summary": str, "source": "llm"|"template"}
+    """
+    template_summary = generate_knowledge_graph_summary()
+
+    try:
+        from app.config import get_settings
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            return {"summary": template_summary, "source": "template"}
+
+        from anthropic import Anthropic
+        client = Anthropic(api_key=settings.anthropic_api_key)
+
+        system_prompt = (
+            "You are an intelligence analyst for a fuel logistics company. "
+            "Given the following operational data about carriers and sites, write a clear, "
+            "actionable intelligence briefing. Use specific numbers. Organize by priority — "
+            "flag carriers and sites that need attention first. Keep it professional and concise. "
+            "Use markdown headers (##) to organize sections. Do not repeat raw data — synthesize insights."
+        )
+
+        # Truncate if too long for Haiku
+        input_text = template_summary[:6000] if len(template_summary) > 6000 else template_summary
+
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": input_text}],
+        )
+
+        llm_text = response.content[0].text.strip()
+
+        # Record usage
+        try:
+            db = SessionLocal()
+            from app.services.llm_usage import record_llm_usage
+            record_llm_usage(db, "kg_summary", "claude-haiku-4-5-20251001",
+                             response.usage.input_tokens, response.usage.output_tokens)
+            db.close()
+        except Exception:
+            pass
+
+        return {"summary": llm_text, "source": "llm"}
+
+    except Exception as e:
+        logger.warning(f"[KnowledgeGraph] LLM KG summary failed, using template: {e}")
+        return {"summary": template_summary, "source": "template"}
+
+
 def get_all_intelligence() -> Dict[str, Any]:
     """Get full knowledge graph summary for the UI."""
     db = SessionLocal()

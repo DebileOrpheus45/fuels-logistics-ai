@@ -149,6 +149,7 @@ export const refreshKnowledgeGraph = () => api.post('/intelligence/refresh').the
 export const getStatusSummary = () => api.get('/intelligence/status-summary').then(res => res.data)
 export const getStatusSummaryLlm = () => api.get('/intelligence/status-summary?llm=true').then(res => res.data)
 export const getFullKgSummary = () => api.get('/intelligence/full-summary').then(res => res.data)
+export const getFullKgSummaryLlm = () => api.get('/intelligence/full-summary?llm=true').then(res => res.data)
 export const getLlmUsage = () => api.get('/intelligence/admin/llm-usage').then(res => res.data)
 
 // Google Sheets
