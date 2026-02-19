@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Don't crash on unknown env vars (e.g. GMAIL_ENABLED)
 
 
 @lru_cache()

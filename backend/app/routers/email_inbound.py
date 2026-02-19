@@ -231,8 +231,11 @@ def process_inbound_email(
         db.add(escalation)
 
     # Update inbound email record with auto-reply status
+    reply_actually_sent = reply_result and reply_result.get("success", False)
+    if not reply_actually_sent and auto_reply_type:
+        logger.warning(f"Auto-reply ({auto_reply_type}) FAILED for {po_number}: {reply_result}")
     if auto_reply_type:
-        inbound.auto_reply_sent = True
+        inbound.auto_reply_sent = reply_actually_sent
         inbound.auto_reply_type = auto_reply_type
 
         # Log auto-reply activity

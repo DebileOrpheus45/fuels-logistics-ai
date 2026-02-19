@@ -3235,13 +3235,22 @@ function EmailsPanel({ emails, inboundEmails, onViewEmail }) {
                   <Mail className="h-3.5 w-3.5 text-emerald-500" />
                   <span className="font-medium text-slate-700">{email.from_email}</span>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  email.parse_success
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-amber-50 text-amber-700'
-                }`}>
-                  {email.parse_success ? 'Parsed' : 'Needs Review'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {email.parse_method && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      email.parse_method === 'llm' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {email.parse_method.toUpperCase()}
+                    </span>
+                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    email.parse_success
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    {email.parse_success ? 'Parsed' : 'Needs Review'}
+                  </span>
+                </div>
               </div>
               <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
               <div className="flex items-center justify-between mt-1">

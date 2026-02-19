@@ -81,35 +81,25 @@ def extract_po_number(subject: str, body: str) -> Optional[str]:
 # LLM-BASED PARSING
 # ============================================================
 
-_LLM_AVAILABLE: Optional[bool] = None
-
-
 def _get_anthropic_client():
-    """Lazy-init Anthropic client. Returns None if no API key."""
-    global _LLM_AVAILABLE
-    if _LLM_AVAILABLE is False:
-        return None
-
-    # Try settings first (loads from .env via pydantic), then fall back to os.environ
+    """Get Anthropic client for LLM parsing. Returns None if unavailable."""
+    # Try settings first, then fall back to os.environ
     api_key = ""
     try:
         from app.config import get_settings
         api_key = get_settings().anthropic_api_key
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to load settings for LLM parsing: {e}")
     if not api_key:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        _LLM_AVAILABLE = False
         logger.info("No ANTHROPIC_API_KEY - email parser will use regex only")
         return None
 
     try:
         from anthropic import Anthropic
-        _LLM_AVAILABLE = True
         return Anthropic(api_key=api_key)
     except ImportError:
-        _LLM_AVAILABLE = False
         logger.warning("anthropic package not installed - email parser will use regex only")
         return None
 
