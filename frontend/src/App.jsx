@@ -3311,6 +3311,223 @@ function StatsCard({ title, value, icon: Icon, color = 'blue', onClick, clickabl
   )
 }
 
+// ============== System Documentation ==============
+function SystemDocumentation() {
+  const [activeDocTab, setActiveDocTab] = useState('email-parsing')
+
+  const docTabs = [
+    { id: 'email-parsing', label: 'Email Parsing Pipeline' },
+    { id: 'knowledge-graph', label: 'Knowledge Graph' },
+    { id: 'agent-logic', label: 'Agent Decision Logic' },
+    { id: 'guardrails', label: 'Guardrails & Validation' },
+  ]
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <FileText className="h-4 w-4 text-slate-600" />
+        <h4 className="text-sm font-semibold text-slate-800">System Documentation</h4>
+        <span className="text-xs text-slate-500">How each subsystem works under the hood</span>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-4 bg-slate-100 rounded-lg p-1">
+        {docTabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveDocTab(tab.id)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+              activeDocTab === tab.id
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="text-sm text-slate-700 leading-relaxed">
+
+        {activeDocTab === 'email-parsing' && (
+          <div className="space-y-4">
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">Two-Tier Parsing Strategy</h5>
+              <p className="text-slate-600 mb-3">
+                Every inbound carrier email goes through a two-tier parsing pipeline. The system tries LLM first (Claude Haiku) for intelligent extraction, then falls back to regex pattern matching if the LLM is unavailable.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
+                  <div className="text-xs font-bold text-purple-800 mb-1">1. Self-Email Guard</div>
+                  <div className="text-[11px] text-purple-700">
+                    Before any parsing, the system checks if the email is from our own outbound address (auto-reply loop detection). Self-emails are logged but never parsed or used to update ETAs.
+                  </div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <div className="text-xs font-bold text-blue-800 mb-1">2. LLM Parsing (Primary)</div>
+                  <div className="text-[11px] text-blue-700">
+                    Claude Haiku receives the full email with a structured prompt. It understands context: "6 pm tmrw", relative times ("couple hours"), time ranges ("1-3 PM" → uses 3 PM worst-case), and ignores phone numbers and quoted text.
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <div className="text-xs font-bold text-slate-800 mb-1">3. Regex Fallback</div>
+                  <div className="text-[11px] text-slate-600">
+                    Only runs if LLM is unavailable. Strips quoted reply text first (Gmail/Outlook headers), then tries pattern matching: military time (0600), H:MM AM/PM, H AM/PM, time ranges. Checks for vague keywords ("running late", "delayed").
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">LLM Response Classification</h5>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
+                  <div>
+                    <span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-semibold mb-1">status: "ok"</span>
+                    <p className="text-slate-600">LLM found a specific time. Returns HHMM format (e.g., "1630"). Validated for real hours (0-23) and minutes (0-59).</p>
+                  </div>
+                  <div>
+                    <span className="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-semibold mb-1">status: "vague"</span>
+                    <p className="text-slate-600">LLM understood the email but no specific time extractable. Examples: "running late", "don't know yet", "next week". Triggers coordinator escalation.</p>
+                  </div>
+                  <div>
+                    <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-semibold mb-1">status: "unknown"</span>
+                    <p className="text-slate-600">LLM cannot determine intent at all. Falls through same as "vague" — no ETA update, escalation created.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">Auto-Reply Logic</h5>
+              <div className="text-[11px] text-slate-600 space-y-1">
+                <p><span className="font-semibold text-green-700">Good ETA parsed:</span> Thank-you reply sent to carrier confirming the recorded ETA. Load updated.</p>
+                <p><span className="font-semibold text-amber-700">Vague / no ETA:</span> Escalation reply sent to carrier asking for specific time. Coordinator CC'd. Escalation record created in dashboard.</p>
+                <p><span className="font-semibold text-slate-500">Self-email detected:</span> No reply sent, no ETA update. Audit record only.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeDocTab === 'knowledge-graph' && (
+          <div className="space-y-4">
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">How Intelligence Builds Over Time</h5>
+              <p className="text-slate-600 mb-3">
+                The knowledge graph is a qualitative layer that accumulates carrier and site intelligence from every operational event. It never resets — data builds cumulatively.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <div className="text-xs font-bold text-blue-800 mb-1">Carrier Intelligence</div>
+                  <ul className="text-blue-700 space-y-0.5 list-disc list-inside">
+                    <li><span className="font-semibold">On-time rate:</span> Updated on every delivery (delivered vs. scheduled)</li>
+                    <li><span className="font-semibold">Responsiveness:</span> Average time to reply to ETA request emails</li>
+                    <li><span className="font-semibold">Qualitative notes:</span> Accumulated from escalation patterns, email behavior</li>
+                    <li><span className="font-semibold">Reliability score:</span> Composite of on-time rate + responsiveness</li>
+                  </ul>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                  <div className="text-xs font-bold text-amber-800 mb-1">Site Intelligence</div>
+                  <ul className="text-amber-700 space-y-0.5 list-disc list-inside">
+                    <li><span className="font-semibold">Delivery count:</span> Total successful deliveries to this site</li>
+                    <li><span className="font-semibold">Escalation history:</span> Frequency and type of issues at this site</li>
+                    <li><span className="font-semibold">False alarm rate:</span> Escalations that were resolved without real issue</li>
+                    <li><span className="font-semibold">Risk score:</span> Higher = more historical problems</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">Event Triggers</h5>
+              <p className="text-[11px] text-slate-600">
+                Four events update the knowledge graph: <span className="font-semibold">Load Delivered</span> (carrier on-time rate, site delivery count), <span className="font-semibold">Escalation Resolved</span> (site false alarm rate, risk score), <span className="font-semibold">ETA Email Reply</span> (carrier response time), and <span className="font-semibold">Non-ETA Email Detection</span> (auto-escalates shortages, breakdowns, cancellations via LLM classification).
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeDocTab === 'agent-logic' && (
+          <div className="space-y-4">
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">Two-Tier Decision Architecture</h5>
+              <p className="text-slate-600 mb-3">
+                The AI coordinator uses a tiered approach: deterministic rules handle routine monitoring (cheap, fast, predictable), while LLM reasoning handles complex situations requiring judgment.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                  <div className="text-xs font-bold text-green-800 mb-1">Tier 1: Rules Engine (No LLM)</div>
+                  <ul className="text-green-700 space-y-0.5 list-disc list-inside">
+                    <li>Inventory runout calculations (hours remaining = volume / burn rate)</li>
+                    <li>Threshold-based alerts: critical (&lt;24h), warning (&lt;48h)</li>
+                    <li>ETA comparison: is the load arriving before runout?</li>
+                    <li>Periodic site health checks on configurable intervals</li>
+                  </ul>
+                </div>
+                <div className="bg-violet-50 rounded-lg p-3 border border-violet-100">
+                  <div className="text-xs font-bold text-violet-800 mb-1">Tier 2: LLM Reasoning (Claude Sonnet)</div>
+                  <ul className="text-violet-700 space-y-0.5 list-disc list-inside">
+                    <li>Complex escalation decisions with multiple factors</li>
+                    <li>Natural language understanding of carrier email content</li>
+                    <li>Executive briefings and intelligence reports</li>
+                    <li>Ambiguous scenario analysis (conflicting data, partial info)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">Agent Run Cycle</h5>
+              <p className="text-[11px] text-slate-600">
+                Each agent runs on a configurable interval (default 15 min). Per cycle: scan assigned sites → calculate runout → check active loads → compare ETAs vs. runout → escalate if needed → send ETA request emails for overdue loads → log all decisions to run history.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeDocTab === 'guardrails' && (
+          <div className="space-y-4">
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">ETA Validation Guardrails</h5>
+              <p className="text-slate-600 mb-3">
+                Every parsed ETA (from LLM or regex) passes through validation before being accepted. Invalid ETAs are rejected and the email is treated as "vague" (triggering escalation).
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                  <div className="text-xs font-bold text-red-800 mb-1">Rejected (Invalid)</div>
+                  <ul className="text-red-700 space-y-0.5 list-disc list-inside">
+                    <li><span className="font-semibold">Invalid time:</span> Hour &gt; 23 or minute &gt; 59 (e.g., "2700", "1561")</li>
+                    <li><span className="font-semibold">Too far in future:</span> More than 72 hours from now</li>
+                    <li><span className="font-semibold">In the past:</span> More than 1 hour before current time</li>
+                    <li><span className="font-semibold">LLM nonsense:</span> Non-4-digit responses, malformed JSON</li>
+                  </ul>
+                </div>
+                <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                  <div className="text-xs font-bold text-green-800 mb-1">Accepted (With Adjustments)</div>
+                  <ul className="text-green-700 space-y-0.5 list-disc list-inside">
+                    <li><span className="font-semibold">Time in past today:</span> Automatically shifted to tomorrow</li>
+                    <li><span className="font-semibold">Time ranges:</span> Worst-case (later time) used</li>
+                    <li><span className="font-semibold">Relative times:</span> LLM adds offset to received timestamp</li>
+                    <li><span className="font-semibold">"Tomorrow":</span> LLM resolves to next calendar day</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h5 className="font-semibold text-slate-800 mb-2">Email Loop Prevention</h5>
+              <div className="text-[11px] text-slate-600 space-y-1">
+                <p><span className="font-semibold">Self-email detection:</span> Emails from our Resend outbound address are detected before any parsing. They are logged for audit but never trigger ETA updates or auto-replies.</p>
+                <p><span className="font-semibold">Quoted text stripping:</span> Gmail and Outlook quoted reply headers are removed before regex parsing, preventing times from quoted email headers (e.g., "On Wed, Feb 18 at 9:53 PM...") from being extracted as ETAs.</p>
+                <p><span className="font-semibold">LLM context awareness:</span> The LLM prompt explicitly instructs it to ignore times in quoted reply text, phone numbers, PO numbers, and email signatures.</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ============== Main Dashboard ==============
 function Dashboard({ user, onLogout }) {
   const queryClient = useQueryClient()
@@ -4343,6 +4560,9 @@ function Dashboard({ user, onLogout }) {
                 </div>
               </div>
             </div>
+
+            {/* System Documentation */}
+            <SystemDocumentation />
           </div>
         )}
 

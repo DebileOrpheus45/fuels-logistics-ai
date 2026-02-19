@@ -149,7 +149,11 @@ Rules:
 - For time ranges, use the LATER time (worst-case).
 - For RELATIVE time references like "couple hours", "in an hour", "about 2 hours", "30 minutes", calculate the actual time by adding the offset to the email received time shown above.
 - For example, if the email was received at 1:46 PM and says "next couple hours", return "1546" (1:46 PM + 2 hours). For "about an hour", add 1 hour. For "30 minutes", add 30 minutes. Always round UP for vague durations ("couple" = 2, "few" = 3).
+- "tomorrow" or "tmrw" means the next calendar day after the received date. "6 pm tomorrow" received on Feb 18 = "1800" (it will be assigned to Feb 19 automatically).
 - Ignore times that are clearly part of phone numbers, PO numbers, addresses, or signatures.
+- Ignore times in quoted reply text (text after "On ... wrote:" or "> " prefixed lines).
+- The time_24h field MUST be a valid 24h time: hours 00-23, minutes 00-59. Never return values like "2700" or "2561".
+- ETAs more than 3 days in the future are suspicious for fuel deliveries — return "vague" with a reason if the timeframe seems unreasonable.
 - Only return "vague" for truly unresolvable responses (e.g. "running late" with no timeframe, "delayed indefinitely", "not sure", "don't know").
 - If you cannot determine an ETA at all, return status "unknown".
 
@@ -165,11 +169,13 @@ Examples:
 - "Should arrive 4:30 PM" -> {{"status": "ok", "time_24h": "1630"}}
 - "between 1200 and 1400" -> {{"status": "ok", "time_24h": "1400"}}
 - "1-3 PM" -> {{"status": "ok", "time_24h": "1500"}}
+- "6 pm tomorrow" -> {{"status": "ok", "time_24h": "1800"}}
 - "next couple hours" (received 1:46 PM) -> {{"status": "ok", "time_24h": "1546"}}
 - "about an hour" (received 10:00 AM) -> {{"status": "ok", "time_24h": "1100"}}
 - "30 minutes out" (received 3:15 PM) -> {{"status": "ok", "time_24h": "1545"}}
 - "Running late, will update" -> {{"status": "vague", "reason": "running late, no timeframe"}}
 - "I don't know yet" -> {{"status": "vague", "reason": "unknown eta"}}
+- "next week sometime" -> {{"status": "vague", "reason": "too far in future for fuel delivery"}}
 """
 
 def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[datetime]:
@@ -217,11 +223,14 @@ def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[da
 
         if result.get("status") == "ok":
             time_str = result["time_24h"]
-            # Validate format
-            if re.match(r'^\d{4}$', time_str):
-                return combine_date_and_time(sent_date, time_str)
-            logger.warning(f"LLM returned invalid time format: {time_str}")
-            return None
+            if not validate_time_str(time_str):
+                logger.warning(f"LLM returned invalid time '{time_str}' — rejecting")
+                return None
+            eta = combine_date_and_time(sent_date, time_str)
+            if eta is None:
+                logger.warning(f"LLM time '{time_str}' failed guardrails (past/future) — rejecting")
+                return _LLM_NO_RESULT  # Don't fall through to regex with bad data
+            return eta
 
         if result.get("status") in ("vague", "unknown"):
             logger.info(f"LLM classified email as {result['status']}: {result.get('reason', '')}")
@@ -347,13 +356,55 @@ def normalize_time(time_str: str) -> str:
     return time_str
 
 
-def combine_date_and_time(base_date: datetime, time_str: str) -> datetime:
-    """Combine a date with HHMM time string. Assumes tomorrow if time is past."""
+def validate_time_str(time_str: str) -> bool:
+    """Validate HHMM time string has real hour (0-23) and minute (0-59)."""
+    if not re.match(r'^\d{4}$', time_str):
+        return False
     hour = int(time_str[:2])
     minute = int(time_str[2:4])
+    return 0 <= hour <= 23 and 0 <= minute <= 59
+
+
+# Maximum hours into the future an ETA can be (fuel deliveries are same-day/next-day)
+MAX_ETA_FUTURE_HOURS = 72
+# Maximum hours in the past we'll accept (allow some clock drift)
+MAX_ETA_PAST_HOURS = 1
+
+
+def combine_date_and_time(base_date: datetime, time_str: str) -> Optional[datetime]:
+    """
+    Combine a date with HHMM time string.
+    Returns None if the time is nonsensical or outside the reasonable window.
+
+    Guardrails:
+      - Hour must be 0-23, minute must be 0-59 (rejects "2700", "1561")
+      - If time is in the past (today), assumes tomorrow
+      - ETA must be within MAX_ETA_FUTURE_HOURS (72h) — rejects "next week" style results
+      - ETA must not be more than MAX_ETA_PAST_HOURS (1h) in the past — rejects stale info
+    """
+    if not validate_time_str(time_str):
+        logger.warning(f"Rejected invalid time '{time_str}': hour/minute out of range")
+        return None
+
+    hour = int(time_str[:2])
+    minute = int(time_str[2:4])
+    now = datetime.now()
     eta = base_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if eta < datetime.now():
+
+    # If time is in the past today, assume tomorrow
+    if eta < now:
         eta += timedelta(days=1)
+
+    # Guardrail: too far in the future
+    if eta > now + timedelta(hours=MAX_ETA_FUTURE_HOURS):
+        logger.warning(f"Rejected ETA {eta} — more than {MAX_ETA_FUTURE_HOURS}h in the future")
+        return None
+
+    # Guardrail: too far in the past (even after tomorrow bump)
+    if eta < now - timedelta(hours=MAX_ETA_PAST_HOURS):
+        logger.warning(f"Rejected ETA {eta} — more than {MAX_ETA_PAST_HOURS}h in the past")
+        return None
+
     return eta
 
 
