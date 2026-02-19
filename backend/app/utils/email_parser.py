@@ -26,6 +26,36 @@ logger = logging.getLogger(__name__)
 _LLM_NO_RESULT = object()
 
 
+def _strip_quoted_text(body: str) -> str:
+    """
+    Strip quoted reply text from email body.
+    Gmail: 'On Mon, Jan 1, 2026 at 3:00 PM Name <email> wrote:'
+    Outlook: '-----Original Message-----' or '________________________________'
+    Generic: lines starting with '>'
+    """
+    lines = body.split('\n')
+    cleaned = []
+    for line in lines:
+        # Gmail quote header
+        if re.match(r'^On\s+\w{3},\s+\w{3}\s+\d', line, re.IGNORECASE):
+            break
+        if re.match(r'^On\s+\d{1,2}/\d{1,2}/\d{2,4}', line, re.IGNORECASE):
+            break
+        # Outlook separators
+        if line.strip().startswith('-----Original Message'):
+            break
+        if re.match(r'^_{10,}', line.strip()):
+            break
+        # Dashed separator (common in auto-generated emails)
+        if line.strip() == '--':
+            break
+        # Skip quoted lines
+        if line.strip().startswith('>'):
+            continue
+        cleaned.append(line)
+    return '\n'.join(cleaned).strip()
+
+
 def parse_eta_from_email(subject: str, body: str, sent_date: Optional[datetime] = None) -> Optional[datetime]:
     """
     Parse ETA from carrier email reply.
@@ -49,11 +79,14 @@ def parse_eta_from_email_with_method(subject: str, body: str, sent_date: Optiona
 
     llm_result = _parse_with_llm(subject, body, sent_date)
     if llm_result is _LLM_NO_RESULT:
+        logger.info("ETA parse result: LLM says no ETA (vague/unknown)")
         return None, "llm"  # LLM explicitly says no ETA
     if llm_result is not None:
+        logger.info(f"ETA parse result: LLM returned {llm_result}")
         return llm_result, "llm"
 
     # LLM unavailable or errored -> regex fallback
+    logger.info("LLM unavailable or failed — falling back to regex")
     regex_result = _parse_with_regex(subject, body, sent_date)
     return regex_result, "regex" if regex_result else None
 
@@ -148,8 +181,10 @@ def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[da
     """
     client = _get_anthropic_client()
     if client is None:
+        logger.warning("LLM email parsing skipped: no Anthropic client (check ANTHROPIC_API_KEY)")
         return None  # no key -> fall through to regex
 
+    logger.info("LLM email parsing: Anthropic client available, calling Claude Haiku")
     user_msg = f"Subject: {subject}\n\nBody:\n{body}"
     system_prompt = _PARSE_PROMPT.format(received_at=sent_date.strftime("%Y-%m-%d %I:%M %p"))
 
@@ -208,7 +243,9 @@ def _parse_with_llm(subject: str, body: str, sent_date: datetime) -> Optional[da
 
 def _parse_with_regex(subject: str, body: str, sent_date: datetime) -> Optional[datetime]:
     """Regex-based ETA parsing. Used when LLM is unavailable."""
-    text = body.lower().strip()
+    # Strip quoted reply text to avoid parsing times from Gmail/Outlook quoted headers
+    stripped = _strip_quoted_text(body)
+    text = (stripped if stripped else body).lower().strip()
 
     # Check for vague/delayed responses
     vague_patterns = [

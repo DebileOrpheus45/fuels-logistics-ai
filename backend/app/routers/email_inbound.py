@@ -75,6 +75,32 @@ def process_inbound_email(
     received_at = email.received_at or datetime.now()
     settings = get_settings()
 
+    # ── Self-email guard: skip processing for our own auto-replies ──
+    # When we send auto-replies via Resend, they can land in the Gmail inbox
+    # the IMAP poller watches, creating a loop. Detect and skip early.
+    from_lower = email.from_email.lower().strip()
+    is_self = settings.resend_from_email.lower() in from_lower
+    if is_self:
+        logger.info(f"Skipping self-email from {email.from_email} — not processing as carrier reply")
+        # Save minimal record for audit trail, but don't parse or update anything
+        inbound = InboundEmail(
+            from_email=email.from_email,
+            subject=email.subject,
+            body=email.body,
+            po_number=extract_po_number(email.subject, email.body),
+            parse_success=False,
+            parse_message="Skipped: self-email (auto-reply from our system)",
+            received_at=received_at,
+            processed_at=datetime.now(),
+        )
+        db.add(inbound)
+        db.commit()
+        return InboundEmailResponse(
+            success=False,
+            po_number=inbound.po_number,
+            message="Skipped: self-email from our outbound address",
+        )
+
     # Extract PO number from subject or body
     po_number = extract_po_number(email.subject, email.body)
 
@@ -165,14 +191,7 @@ def process_inbound_email(
     auto_reply_type = None
     reply_result = None
 
-    # Loop guard: never reply to our own outbound address
-    # Only check resend_from_email (what we send AS), not gmail_user (what we poll FROM)
-    from_lower = email.from_email.lower().strip()
-    is_self = settings.resend_from_email.lower() in from_lower
-
-    if is_self:
-        logger.info(f"Skipping auto-reply: sender is our outbound address ({email.from_email})")
-    elif success:
+    if success:
         # Case A: Good ETA — send thank-you
         reply_body = (
             f"Thank you for the update on PO #{po_number}.\n\n"
