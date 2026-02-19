@@ -3536,6 +3536,8 @@ function Dashboard({ user, onLogout }) {
   const [selectedEmail, setSelectedEmail] = useState(null)
   const [selectedLoad, setSelectedLoad] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [settingsSubTab, setSettingsSubTab] = useState('sheets') // 'sheets', 'llm-usage'
+  const [showSidebar, setShowSidebar] = useState(true) // collapsible right sidebar
   const [siteFilter, setSiteFilter] = useState('all') // 'all', 'at-risk', 'critical', 'delayed'
   const [customerFilter, setCustomerFilter] = useState('') // filter by customer
   const [loadStatusFilter, setLoadStatusFilter] = useState('all') // 'all', 'SCHEDULED', 'IN_TRANSIT', 'DELAYED', 'DELIVERED'
@@ -3608,7 +3610,7 @@ function Dashboard({ user, onLogout }) {
   const { data: llmUsageData } = useQuery({
     queryKey: ['llm-usage'],
     queryFn: getLlmUsage,
-    enabled: activeTab === 'admin',
+    enabled: activeTab === 'settings',
     refetchInterval: 30000,
   })
 
@@ -3925,7 +3927,7 @@ function Dashboard({ user, onLogout }) {
         <div className="flex gap-6">
           {/* Left Sidebar - Tab Navigation */}
           <div className="w-48 flex-shrink-0">
-            <nav className="flex flex-col gap-1 h-[400px]">
+            <nav className="flex flex-col gap-1 h-[340px]">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: Activity },
                 { id: 'sites', label: 'Sites', icon: Fuel },
@@ -3933,8 +3935,7 @@ function Dashboard({ user, onLogout }) {
                 { id: 'agent-monitor', label: 'Agent Monitor', icon: Bot },
                 { id: 'escalations', label: 'Escalations', icon: Bell },
                 { id: 'intelligence', label: 'System Logic', icon: Brain },
-                { id: 'sheets', label: 'Google Sheets', icon: FileSpreadsheet },
-                { id: 'admin', label: 'Admin', icon: Settings }
+                { id: 'settings', label: 'Settings', icon: Settings }
               ].map(({ id, label, icon: TabIcon }) => (
                 <button
                   key={id}
@@ -3961,7 +3962,16 @@ function Dashboard({ user, onLogout }) {
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+            <div className={`${showSidebar ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
+              <div className="flex items-center justify-end mb-[-12px]">
+                <button
+                  onClick={() => setShowSidebar(!showSidebar)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition"
+                >
+                  {showSidebar ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  {showSidebar ? 'Hide Panel' : 'Show Agent Panel'}
+                </button>
+              </div>
               <LoadsTable
                 loads={loads}
                 statusFilter={loadStatusFilter}
@@ -3969,10 +3979,11 @@ function Dashboard({ user, onLogout }) {
                 onLoadClick={setSelectedLoad}
               />
             </div>
-            <div className="space-y-6">
-              <AgentManagementPanel agents={agents} sites={sites} />
-              <EmailsPanel emails={emails} inboundEmails={inboundEmails} onViewEmail={setSelectedEmail} />
-            </div>
+            {showSidebar && (
+              <div className="space-y-6">
+                <AgentManagementPanel agents={agents} sites={sites} />
+              </div>
+            )}
           </div>
         )}
 
@@ -4179,6 +4190,15 @@ function Dashboard({ user, onLogout }) {
                 ))}
               </div>
             )}
+
+            {/* Email Communications — moved here from Dashboard sidebar */}
+            <div className="mt-6">
+              <EmailsPanel
+                emails={emails}
+                inboundEmails={inboundEmails}
+                onViewEmail={setSelectedEmail}
+              />
+            </div>
           </div>
         )}
 
@@ -4566,16 +4586,38 @@ function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* Google Sheets Tab */}
-        {activeTab === 'sheets' && (
-          <div className="max-w-2xl">
-            <h2 className="text-xl font-bold mb-4">Google Sheets Integration</h2>
-            <GoogleSheetsPanel sites={sites} loads={loads} />
-          </div>
-        )}
+        {/* Settings Tab (Google Sheets + LLM Usage) */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">Settings</h2>
+              <div className="flex bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setSettingsSubTab('sheets')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
+                    settingsSubTab === 'sheets' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5" /> Google Sheets</span>
+                </button>
+                <button
+                  onClick={() => setSettingsSubTab('llm-usage')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
+                    settingsSubTab === 'llm-usage' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" /> LLM Usage</span>
+                </button>
+              </div>
+            </div>
 
-        {/* Admin Tab */}
-        {activeTab === 'admin' && (
+            {settingsSubTab === 'sheets' && (
+              <div className="max-w-2xl">
+                <GoogleSheetsPanel sites={sites} loads={loads} />
+              </div>
+            )}
+
+            {settingsSubTab === 'llm-usage' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-slate-900">Admin — LLM Usage</h2>
 
@@ -4669,6 +4711,8 @@ function Dashboard({ user, onLogout }) {
                 </tbody>
               </table>
             </div>
+          </div>
+            )}
           </div>
         )}
 
