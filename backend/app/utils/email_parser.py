@@ -14,6 +14,7 @@ import os
 import re
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
+from app.config import now_local
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def parse_eta_from_email_with_method(subject: str, body: str, sent_date: Optiona
     method is "llm", "regex", or None.
     """
     if sent_date is None:
-        sent_date = datetime.now()
+        sent_date = now_local().replace(tzinfo=None)
 
     llm_result = _parse_with_llm(subject, body, sent_date)
     if llm_result is _LLM_NO_RESULT:
@@ -388,7 +389,7 @@ def combine_date_and_time(base_date: datetime, time_str: str) -> Optional[dateti
 
     hour = int(time_str[:2])
     minute = int(time_str[2:4])
-    now = datetime.now()
+    now = now_local().replace(tzinfo=None)
     eta = base_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
     # If time is in the past today, assume tomorrow

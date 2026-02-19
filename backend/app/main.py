@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from app.database import engine, Base
-from app.config import get_settings
+from app.config import get_settings, now_local
 from app.routers import sites, loads, agents, escalations, carriers, emails, snapshots, staleness, email_inbound, auth, sheets, intelligence
 from app.schemas import DashboardStats
 from app.auth import get_current_user
@@ -168,7 +168,7 @@ def health_check():
 
     health = {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": now_local().isoformat(),
         "version": "0.4.0",
         "checks": {}
     }

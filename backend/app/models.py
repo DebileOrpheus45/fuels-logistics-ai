@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.config import now_local
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime,
     ForeignKey, Text, Enum, JSON, ARRAY
@@ -6,6 +7,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 import enum
 from app.database import Base
+
+
+def _now_eastern():
+    """Column default: naive Eastern datetime for SQLAlchemy."""
+    return now_local().replace(tzinfo=None)
 
 
 class LoadStatus(str, enum.Enum):
@@ -115,8 +121,8 @@ class Site(Base):
     last_inventory_update_at = Column(DateTime, nullable=True)
     inventory_staleness_threshold_hours = Column(Integer, default=2)  # Alert if no update
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     assigned_agent = relationship("AIAgent", back_populates="assigned_sites")
@@ -129,7 +135,7 @@ class Site(Base):
         """Check if inventory data is stale based on threshold."""
         if not self.last_inventory_update_at:
             return True
-        staleness = datetime.utcnow() - self.last_inventory_update_at
+        staleness = now_local().replace(tzinfo=None) - self.last_inventory_update_at
         return staleness.total_seconds() / 3600 > self.inventory_staleness_threshold_hours
 
     @property
@@ -137,7 +143,7 @@ class Site(Base):
         """Get how many hours since last inventory update."""
         if not self.last_inventory_update_at:
             return None
-        staleness = datetime.utcnow() - self.last_inventory_update_at
+        staleness = now_local().replace(tzinfo=None) - self.last_inventory_update_at
         return staleness.total_seconds() / 3600
 
 
@@ -149,8 +155,8 @@ class Carrier(Base):
     dispatcher_email = Column(String(255))
     dispatcher_phone = Column(String(50))
     response_time_sla_hours = Column(Integer, default=4)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     lanes = relationship("Lane", back_populates="carrier")
@@ -166,8 +172,8 @@ class Lane(Base):
     carrier_id = Column(Integer, ForeignKey("carriers.id"), nullable=False)
     origin_terminal = Column(String(255))
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     site = relationship("Site", back_populates="lanes")
@@ -208,8 +214,8 @@ class Load(Base):
     destination_address = Column(String(500), nullable=True)
     shipped_at = Column(DateTime, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     lane = relationship("Lane", back_populates="loads")
@@ -225,7 +231,7 @@ class Load(Base):
         """Check if ETA data is stale based on threshold."""
         if not self.last_eta_update_at:
             return True
-        staleness = datetime.utcnow() - self.last_eta_update_at
+        staleness = now_local().replace(tzinfo=None) - self.last_eta_update_at
         return staleness.total_seconds() / 3600 > self.eta_staleness_threshold_hours
 
     @property
@@ -233,7 +239,7 @@ class Load(Base):
         """Get how many hours since last ETA update."""
         if not self.last_eta_update_at:
             return None
-        staleness = datetime.utcnow() - self.last_eta_update_at
+        staleness = now_local().replace(tzinfo=None) - self.last_eta_update_at
         return staleness.total_seconds() / 3600
 
 
@@ -256,8 +262,8 @@ class AIAgent(Base):
     overnight_end_hour = Column(Integer, default=6)  # 6 AM
     coverage_hours = Column(String(255), nullable=True)  # e.g., "24/7", "business_hours", "overnight_only"
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     assigned_sites = relationship("Site", back_populates="assigned_agent")
@@ -280,7 +286,7 @@ class Activity(Base):
     decision_metrics = Column(JSON, nullable=True)  # Key metrics that triggered this action
     reasoning_summary = Column(Text, nullable=True)  # Optional human-readable summary
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
 
     # Relationships
     agent = relationship("AIAgent", back_populates="activities")
@@ -300,9 +306,9 @@ class Escalation(Base):
     status = Column(Enum(EscalationStatus), default=EscalationStatus.OPEN)
     assigned_to = Column(String(255), nullable=True)
     resolution_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
     resolved_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     created_by_agent = relationship("AIAgent", back_populates="escalations")
@@ -323,7 +329,7 @@ class UploadAuditLog(Base):
     records_created = Column(Integer, default=0)
     records_failed = Column(Integer, default=0)
     error_details = Column(JSON, nullable=True)  # List of errors if any
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
 
 
 class User(Base):
@@ -336,8 +342,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.OPERATOR, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
     last_login_at = Column(DateTime, nullable=True)
 
 
@@ -375,8 +381,8 @@ class EmailLog(Base):
     complaint_at = Column(DateTime, nullable=True)
 
     # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_now_eastern, nullable=False, index=True)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     load = relationship("Load", back_populates="email_logs")
@@ -408,8 +414,8 @@ class InboundEmail(Base):
 
     # Timestamps
     received_at = Column(DateTime, nullable=True)
-    processed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    processed_at = Column(DateTime, default=_now_eastern, nullable=False)
+    created_at = Column(DateTime, default=_now_eastern, nullable=False, index=True)
 
     # Relationships
     load = relationship("Load", back_populates="inbound_emails")
@@ -447,7 +453,7 @@ class CarrierStats(Base):
     communication_preference = Column(String, nullable=True)  # e.g. "email", "phone", "text"
     behavioral_notes = Column(String, nullable=True)  # Free text observations
 
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     carrier = relationship("Carrier", backref="stats")
@@ -487,7 +493,7 @@ class SiteStats(Base):
     access_notes = Column(String, nullable=True)  # e.g. "Tight access road, requires small tankers"
     operational_notes = Column(String, nullable=True)  # Free text observations
 
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=_now_eastern, onupdate=_now_eastern)
 
     # Relationships
     site = relationship("Site", backref="stats")
@@ -512,7 +518,7 @@ class AgentRunHistory(Base):
     agent_id = Column(Integer, ForeignKey("ai_agents.id"), nullable=False, index=True)
 
     # Run timing
-    started_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    started_at = Column(DateTime, nullable=False, default=_now_eastern, index=True)
     completed_at = Column(DateTime, nullable=True)
     duration_seconds = Column(Float, nullable=True)
 
@@ -554,4 +560,4 @@ class LlmUsage(Base):
     output_tokens = Column(Integer, default=0)
     cost_usd = Column(Float, default=0.0)
     metadata_ = Column("metadata", JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=_now_eastern, index=True)

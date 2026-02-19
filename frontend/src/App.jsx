@@ -103,6 +103,12 @@ import {
   Sparkles
 } from 'lucide-react'
 
+// ============== Timezone Helpers ==============
+const APP_TZ = 'America/New_York'
+const fmtDate = (d) => new Date(d).toLocaleString('en-US', { timeZone: APP_TZ })
+const fmtTime = (d) => new Date(d).toLocaleTimeString('en-US', { timeZone: APP_TZ })
+const fmtDateOnly = (d) => new Date(d).toLocaleDateString('en-US', { timeZone: APP_TZ })
+
 // ============== Login Page ==============
 function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('')
@@ -457,7 +463,7 @@ function EscalationModal({ escalation, onClose, onResolve }) {
           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
             <div>
               <span className="text-gray-500">Created:</span>
-              <p className="font-medium">{new Date(escalation.created_at).toLocaleString()}</p>
+              <p className="font-medium">{fmtDate(escalation.created_at)}</p>
             </div>
             <div>
               <span className="text-gray-500">Status:</span>
@@ -466,7 +472,7 @@ function EscalationModal({ escalation, onClose, onResolve }) {
             {escalation.status === 'resolved' && escalation.resolved_at && (
               <div>
                 <span className="text-gray-500">Resolved:</span>
-                <p className="font-medium">{new Date(escalation.resolved_at).toLocaleString()}</p>
+                <p className="font-medium">{fmtDate(escalation.resolved_at)}</p>
               </div>
             )}
           </div>
@@ -563,7 +569,7 @@ function EmailDetailModal({ email, onClose }) {
                 {isInbound ? 'Received At' : 'Sent At'}
               </label>
               <p className="text-gray-700">
-                {new Date(isInbound ? email.received_at : email.sent_at).toLocaleString()}
+                {fmtDate(isInbound ? email.received_at : email.sent_at)}
               </p>
             </div>
 
@@ -590,7 +596,7 @@ function EmailDetailModal({ email, onClose }) {
                   <div>
                     <span className="text-xs text-gray-500">Parsed ETA</span>
                     <p className="text-sm font-medium text-gray-900">
-                      {email.parsed_eta ? new Date(email.parsed_eta).toLocaleString() : '(none)'}
+                      {email.parsed_eta ? fmtDate(email.parsed_eta) : '(none)'}
                     </p>
                   </div>
                   <div>
@@ -1292,7 +1298,7 @@ function GoogleSheetsPanel({ sites, loads }) {
       const result = await syncToSheets(sheetUrl, sites, loads)
 
       if (result.success) {
-        const now = new Date().toLocaleString()
+        const now = fmtDate(new Date())
         setLastSync(now)
         localStorage.setItem('lastSync', now)
       }
@@ -1588,7 +1594,7 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                     {getActivityIcon(recentActivities[0].activity_type)}
                     <span>{recentActivities[0].activity_type.replace(/_/g, ' ')}</span>
                     <span className="text-slate-400">
-                      {new Date(recentActivities[0].created_at).toLocaleTimeString()}
+                      {fmtTime(recentActivities[0].created_at)}
                     </span>
                   </div>
                 )}
@@ -1787,7 +1793,7 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                               </span>
                             </div>
                             <p className="text-sm text-gray-500 mt-0.5">
-                              Started {new Date(run.started_at).toLocaleString()}
+                              Started {fmtDate(run.started_at)}
                               {run.duration_seconds && ` • ${run.duration_seconds.toFixed(1)}s`}
                               {run.decisions?.length > 0 && ` • ${run.decisions.length} decision(s)`}
                             </p>
@@ -1944,7 +1950,7 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                     case 'email_sent':
                       return `Sent ETA request to ${d.to || d.carrier_name || 'carrier'}${d.po_number ? ` for ${d.po_number}` : ''}`
                     case 'email_received':
-                      return `Received reply from ${d.from_email || 'carrier'}${d.po_number ? ` for ${d.po_number}` : ''}${d.parse_success ? ` — ETA parsed: ${d.parsed_eta ? new Date(d.parsed_eta).toLocaleString() : ''}` : ' — needs review'}`
+                      return `Received reply from ${d.from_email || 'carrier'}${d.po_number ? ` for ${d.po_number}` : ''}${d.parse_success ? ` — ETA parsed: ${d.parsed_eta ? fmtDate(d.parsed_eta) : ''}` : ' — needs review'}`
                     case 'eta_updated':
                       return d.message || 'ETA updated'
                     case 'escalation_created':
@@ -1991,10 +1997,10 @@ function AgentMonitorTab({ agents, sites, emails, onViewEmail, onManageSites }) 
                     </div>
                     <div className="flex-shrink-0 text-right">
                       <p className="text-xs text-gray-500">
-                        {new Date(activity.created_at).toLocaleDateString()}
+                        {fmtDateOnly(activity.created_at)}
                       </p>
                       <p className="text-xs font-medium text-gray-700">
-                        {new Date(activity.created_at).toLocaleTimeString()}
+                        {fmtTime(activity.created_at)}
                       </p>
                     </div>
                   </div>
@@ -2076,20 +2082,20 @@ function AgentManagementPanel({ agents, sites }) {
                 className={`p-4 cursor-pointer transition ${isSelected ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
                 onClick={() => setSelectedAgent(isSelected ? null : agent.id)}
               >
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${
+                <div className="flex flex-wrap justify-between items-center gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
                       agent.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'
                     }`} />
-                    <div>
-                      <h4 className="font-medium text-slate-900">{agent.agent_name}</h4>
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-slate-900 truncate">{agent.agent_name}</h4>
                       <p className="text-xs text-slate-500">
                         {agentSites.length} sites assigned • {agent.status}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Execution Mode Dropdown */}
                     <select
                       value={agent.execution_mode || 'draft_only'}
@@ -2122,7 +2128,7 @@ function AgentManagementPanel({ agents, sites }) {
                         runCheckMutation.mutate(agent.id)
                       }}
                       disabled={runCheckMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition whitespace-nowrap"
                     >
                       {runCheckMutation.isPending ? (
                         <RefreshCw className="h-4 w-4 animate-spin" />
@@ -2169,7 +2175,7 @@ function AgentManagementPanel({ agents, sites }) {
                             {act.activity_type.replace(/_/g, ' ')}
                           </span>
                           <span className="text-gray-500">
-                            {new Date(act.created_at).toLocaleTimeString()}
+                            {fmtTime(act.created_at)}
                           </span>
                         </div>
                       ))}
@@ -2273,7 +2279,7 @@ function LoadDetailsSidebar({ load: initialLoad, onClose, user }) {
 
   const formatDate = (date) => {
     if (!date) return 'N/A'
-    return new Date(date).toLocaleString()
+    return fmtDate(date)
   }
 
   // Create route line from tracking points
@@ -2434,7 +2440,7 @@ function LoadDetailsSidebar({ load: initialLoad, onClose, user }) {
                       <Popup>
                         <div className="text-sm">
                           <p className="font-bold">Tracking Point {idx + 1}</p>
-                          <p>Time: {new Date(point.timestamp).toLocaleString()}</p>
+                          <p>Time: {fmtDate(point.timestamp)}</p>
                           <p>Speed: {point.speed} mph</p>
                         </div>
                       </Popup>
@@ -2574,7 +2580,7 @@ function LoadDetailsSidebar({ load: initialLoad, onClose, user }) {
                           {note.author}
                         </span>
                         <span className="text-xs text-gray-500 ml-auto">
-                          {new Date(note.timestamp).toLocaleString()}
+                          {fmtDate(note.timestamp)}
                         </span>
                       </div>
                       <p className="text-sm text-gray-800 leading-relaxed">{note.text}</p>
@@ -3042,7 +3048,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                     {load.volume?.toLocaleString()} gal
                   </td>
                   <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
-                    {load.current_eta ? new Date(load.current_eta).toLocaleString() : 'Pending'}
+                    {load.current_eta ? fmtDate(load.current_eta) : 'Pending'}
                   </td>
                   <td className="px-5 py-4 whitespace-nowrap">
                     {getStatusBadge(load.status)}
@@ -3105,7 +3111,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                                       </span>
                                     </div>
                                     <span className="text-xs text-gray-500">
-                                      {new Date(note.timestamp).toLocaleString()}
+                                      {fmtDate(note.timestamp)}
                                     </span>
                                   </div>
                                   <p className="text-sm text-gray-700 ml-6">{note.text}</p>
@@ -3213,7 +3219,7 @@ function EmailsPanel({ emails, inboundEmails, onViewEmail }) {
               </div>
               <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
               <p className="text-xs text-slate-400 mt-1">
-                {new Date(email.sent_at).toLocaleString()}
+                {fmtDate(email.sent_at)}
               </p>
             </div>
           ))}
@@ -3257,11 +3263,11 @@ function EmailsPanel({ emails, inboundEmails, onViewEmail }) {
               <p className="text-sm font-medium text-slate-900 mt-1">{email.subject}</p>
               <div className="flex items-center justify-between mt-1">
                 <p className="text-xs text-slate-400">
-                  {email.received_at ? new Date(email.received_at).toLocaleString() : 'Unknown'}
+                  {email.received_at ? fmtDate(email.received_at) : 'Unknown'}
                 </p>
                 {email.parsed_eta && (
                   <p className="text-xs font-medium text-emerald-600">
-                    ETA: {new Date(email.parsed_eta).toLocaleString()}
+                    ETA: {fmtDate(email.parsed_eta)}
                   </p>
                 )}
               </div>
@@ -4171,11 +4177,11 @@ function Dashboard({ user, onLogout }) {
                         <p className="font-medium mt-1">{esc.description}</p>
                         <div className="flex items-center gap-3 mt-2">
                           <p className="text-xs text-gray-500">
-                            {new Date(esc.created_at).toLocaleString()}
+                            {fmtDate(esc.created_at)}
                           </p>
                           {esc.status === 'resolved' && esc.resolved_at && (
                             <p className="text-xs text-green-600">
-                              Resolved {new Date(esc.resolved_at).toLocaleString()}
+                              Resolved {fmtDate(esc.resolved_at)}
                             </p>
                           )}
                         </div>
@@ -4696,7 +4702,7 @@ function Dashboard({ user, onLogout }) {
                   {(llmUsageData?.recent || []).map((r) => (
                     <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50">
                       <td className="px-5 py-3 text-slate-600">
-                        {r.created_at ? new Date(r.created_at).toLocaleString() : '—'}
+                        {r.created_at ? fmtDate(r.created_at) : '—'}
                       </td>
                       <td className="px-5 py-3 text-slate-800">{r.feature}</td>
                       <td className="px-5 py-3 text-slate-500 text-xs">{r.model}</td>

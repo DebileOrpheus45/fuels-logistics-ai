@@ -14,6 +14,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
+from app.config import now_local
 from app.database import SessionLocal
 from app.models import (
     Site, Load, Carrier, AIAgent, Activity, Escalation, EmailLog,
@@ -94,7 +95,7 @@ def run_rules_check(agent_id: int) -> RuleResult:
             for ss in db.query(SiteStats).filter(SiteStats.site_id.in_(site_ids)).all()
         }
 
-        now = datetime.utcnow()
+        now = now_local().replace(tzinfo=None)
         tier2_context = []
 
         for site in sites:
@@ -264,7 +265,7 @@ def execute_tier1_actions(agent_id: int, actions: List[RuleAction], db: Session 
                 carrier = db.query(Carrier).filter(Carrier.id == action.carrier_id).first()
                 if load and carrier and carrier.dispatcher_email:
                     email_log = send_eta_request(db=db, load=load, carrier=carrier, sent_by_agent_id=agent_id)
-                    load.last_email_sent = datetime.utcnow()
+                    load.last_email_sent = now_local().replace(tzinfo=None)
                     db.commit()
 
                     # Log activity

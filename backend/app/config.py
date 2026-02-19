@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from functools import lru_cache
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 class Settings(BaseSettings):
@@ -29,6 +31,9 @@ class Settings(BaseSettings):
     # CORS - comma-separated allowed origins for production
     cors_origins: str = ""
 
+    # Timezone (IANA format — used for ETA parsing, display, etc.)
+    timezone: str = "America/New_York"
+
     # Agent Settings
     agent_check_interval_minutes: int = 15
     default_runout_threshold_hours: float = 48.0
@@ -51,3 +56,19 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+# ── Timezone helpers ──────────────────────────────────────────
+APP_TZ = ZoneInfo("America/New_York")
+
+
+def now_local() -> datetime:
+    """Return current time in the app timezone (Eastern)."""
+    return datetime.now(APP_TZ)
+
+
+def to_local(dt: datetime) -> datetime:
+    """Convert a datetime to the app timezone. Naive datetimes assumed UTC."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(APP_TZ)
