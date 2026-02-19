@@ -3,33 +3,60 @@ Email endpoints for viewing sent emails and controlling the IMAP poller.
 """
 
 from fastapi import APIRouter, Query, Depends
+from sqlalchemy.orm import Session
 
 from app.services.email_service import email_service
 from app.auth import get_current_user
-from app.models import User
+from app.models import User, EmailLog
+from app.database import get_db
 
 router = APIRouter(prefix="/api/emails", tags=["emails"])
 
 
 @router.get("/sent")
-def get_sent_emails(limit: int = Query(default=20, le=100)):
+def get_sent_emails(
+    limit: int = Query(default=20, le=100),
+    db: Session = Depends(get_db),
+):
     """
-    Get recently sent emails (mock emails for testing).
-    In production, this would query actual sent email records.
+    Get recently sent emails from the database.
+    Persists across server restarts (unlike the old in-memory list).
     """
-    emails = email_service.get_sent_emails(limit=limit)
+    logs = (
+        db.query(EmailLog)
+        .order_by(EmailLog.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    emails = [
+        {
+            "id": log.id,
+            "to": log.recipient,
+            "subject": log.subject,
+            "body": log.body[:300] if log.body else "",
+            "status": log.status.value if log.status else "unknown",
+            "sent_at": (log.sent_at or log.created_at).isoformat(),
+            "message_id": log.message_id,
+            "po_number": None,  # Could extract from subject
+            "carrier_name": None,
+            "method": "resend",
+            "success": log.status.value == "sent" if log.status else False,
+        }
+        for log in logs
+    ]
+
     return {
         "count": len(emails),
-        "emails": emails
+        "emails": emails,
     }
 
 
 @router.get("/sent/count")
-def get_sent_email_count():
-    """Get the count of emails sent in this session."""
-    return {
-        "count": len(email_service.sent_emails)
-    }
+def get_sent_email_count(db: Session = Depends(get_db)):
+    """Get the total count of sent emails (persistent)."""
+    count = db.query(EmailLog).count()
+    return {"count": count}
 
 
 @router.get("/poller/status")
