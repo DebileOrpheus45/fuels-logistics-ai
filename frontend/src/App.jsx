@@ -105,9 +105,17 @@ import {
 
 // ============== Timezone Helpers ==============
 const APP_TZ = 'America/New_York'
-const fmtDate = (d) => new Date(d).toLocaleString('en-US', { timeZone: APP_TZ })
-const fmtTime = (d) => new Date(d).toLocaleTimeString('en-US', { timeZone: APP_TZ })
-const fmtDateOnly = (d) => new Date(d).toLocaleDateString('en-US', { timeZone: APP_TZ })
+// Backend sends naive UTC timestamps (no timezone suffix).
+// Append 'Z' so JavaScript treats them as UTC, then format as Eastern.
+const _utc = (d) => {
+  if (!d) return null
+  const s = String(d)
+  if (!s.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(s)) return new Date(s + 'Z')
+  return new Date(s)
+}
+const fmtDate = (d) => { const dt = _utc(d); return dt ? dt.toLocaleString('en-US', { timeZone: APP_TZ }) : '—' }
+const fmtTime = (d) => { const dt = _utc(d); return dt ? dt.toLocaleTimeString('en-US', { timeZone: APP_TZ }) : '—' }
+const fmtDateOnly = (d) => { const dt = _utc(d); return dt ? dt.toLocaleDateString('en-US', { timeZone: APP_TZ }) : '—' }
 
 // ============== Login Page ==============
 function LoginPage({ onLogin }) {
@@ -2935,68 +2943,68 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
         <table className="min-w-full">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="px-5 py-3 text-left text-xs font-medium text-slate-400 uppercase w-12"></th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-slate-400 uppercase w-10"></th>
               <th
-                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('po_number')}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span>PO #</span>
                   {getSortIcon('po_number')}
                 </div>
               </th>
               <th
-                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('carrier')}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span>Carrier</span>
                   {getSortIcon('carrier')}
                 </div>
               </th>
               <th
-                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('destination')}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span>Destination</span>
                   {getSortIcon('destination')}
                 </div>
               </th>
               <th
-                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('volume')}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span>Volume</span>
                   {getSortIcon('volume')}
                 </div>
               </th>
               <th
-                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('eta')}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span>ETA</span>
                   {getSortIcon('eta')}
                 </div>
               </th>
               <th
-                className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
                 onClick={() => handleSort('status')}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span>Status</span>
                   {getSortIcon('status')}
                 </div>
               </th>
-              <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredAndSortedLoads?.length === 0 && (
               <tr>
-                <td colSpan="8" className="px-5 py-8 text-center text-slate-400">
+                <td colSpan="8" className="px-3 py-6 text-center text-slate-400">
                   No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} loads found
                 </td>
               </tr>
@@ -3008,19 +3016,19 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                   className="hover:bg-slate-50 transition-colors cursor-pointer"
                   onClick={() => onLoadClick?.(load)}
                 >
-                  <td className="px-5 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-2 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setExpandedLoadId(expandedLoadId === load.id ? null : load.id)}
                       className="text-slate-400 hover:text-slate-600 transition"
                     >
                       {expandedLoadId === load.id ? (
-                        <ChevronUp className="h-5 w-5" />
+                        <ChevronUp className="h-4 w-4" />
                       ) : (
-                        <ChevronDown className="h-5 w-5" />
+                        <ChevronDown className="h-4 w-4" />
                       )}
                     </button>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                  <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-slate-900">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         {load.po_number}
@@ -3038,22 +3046,22 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
                     {load.carrier?.carrier_name || 'N/A'}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
                     {load.destination_site?.consignee_code || 'N/A'}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
                     {load.volume?.toLocaleString()} gal
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
                     {load.current_eta ? fmtDate(load.current_eta) : 'Pending'}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     {getStatusBadge(load.status)}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-3 py-3 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                     {(load.status === 'in_transit' || load.status === 'scheduled' || load.status === 'delayed') && (
                       <button
                         onClick={() => emailOneMutation.mutate(load.id)}
@@ -3069,7 +3077,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                 </tr>
                 {expandedLoadId === load.id && (
                   <tr key={`${load.id}-notes`}>
-                    <td colSpan="8" className="px-5 py-4 bg-slate-50 border-t border-slate-100">
+                    <td colSpan="8" className="px-3 py-3 bg-slate-50 border-t border-slate-100">
                       <div className="space-y-4">
                         {/* Existing Notes */}
                         <div>

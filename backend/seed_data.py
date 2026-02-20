@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from app.database import SessionLocal, engine, Base
 from app.models import (
     Site, Carrier, Lane, Load, AIAgent, User,
-    LoadStatus, AgentStatus, AgentExecutionMode, UserRole
+    LoadStatus, AgentStatus, AgentExecutionMode, UserRole, Customer
 )
 from app.auth import get_password_hash
 
@@ -103,15 +103,18 @@ def seed_database():
 
         # Create sites - realistic gas station locations
         sites_data = [
-            ("ATL-001", "Peachtree Fuel & Convenience", "1245 Peachtree St NE, Atlanta, GA 30309", 10000, 6500, 36),
-            ("DFW-042", "Highway 287 Travel Center", "8920 Highway 287, Fort Worth, TX 76179", 15000, 12000, 72),
-            ("HOU-003", "Bay Area Fuel Stop", "2340 Bay Area Blvd, Houston, TX 77058", 8000, 2000, 18),
-            ("LAX-004", "LAX Airport Fuel Services", "6201 W Imperial Hwy, Los Angeles, CA 90045", 50000, 35000, 96),
-            ("CHI-005", "Midway Industrial Fuel", "5450 S Cicero Ave, Chicago, IL 60638", 12000, 8500, 48),
+            ("ATL-001", "Peachtree Fuel & Convenience", "1245 Peachtree St NE, Atlanta, GA 30309", 10000, 6500, 36, Customer.STARK_INDUSTRIES),
+            ("DFW-042", "Highway 287 Travel Center", "8920 Highway 287, Fort Worth, TX 76179", 15000, 12000, 72, Customer.WAYNE_ENTERPRISES),
+            ("HOU-003", "Bay Area Fuel Stop", "2340 Bay Area Blvd, Houston, TX 77058", 8000, 2000, 18, Customer.STARK_INDUSTRIES),
+            ("LAX-004", "LAX Airport Fuel Services", "6201 W Imperial Hwy, Los Angeles, CA 90045", 50000, 35000, 96, Customer.LUTHOR_CORP),
+            ("CHI-005", "Midway Industrial Fuel", "5450 S Cicero Ave, Chicago, IL 60638", 12000, 8500, 48, Customer.WAYNE_ENTERPRISES),
+            ("CLE-006", "Lakeside Fleet Terminal", "3700 Lakeside Ave E, Cleveland, OH 44114", 20000, 14000, 60, Customer.STARK_INDUSTRIES),
+            ("MIA-007", "Port of Miami Fuel Depot", "1015 N America Way, Miami, FL 33132", 18000, 4500, 24, Customer.LUTHOR_CORP),
+            ("SEA-008", "Puget Sound Fuel Hub", "2601 Utah Ave S, Seattle, WA 98134", 14000, 9800, 54, Customer.WAYNE_ENTERPRISES),
         ]
 
         sites = []
-        for code, name, address, capacity, inventory, hours in sites_data:
+        for code, name, address, capacity, inventory, hours, customer in sites_data:
             site = Site(
                 consignee_code=code,
                 consignee_name=name,
@@ -120,6 +123,7 @@ def seed_database():
                 current_inventory=inventory,
                 hours_to_runout=hours,
                 runout_threshold_hours=48,
+                customer=customer,
                 assigned_agent_id=agent.id
             )
             db.add(site)
@@ -148,6 +152,9 @@ def seed_database():
             ("PO-2024-003", sites[2], carriers[0], LoadStatus.IN_TRANSIT, 7500, "gas", 3, "Sarah Chen", "(713) 555-3492"),
             ("PO-2024-004", sites[3], carriers[2], LoadStatus.SCHEDULED, 25000, "diesel", 48, None, None),
             ("PO-2024-005", sites[4], carriers[1], LoadStatus.DELAYED, 10000, "gas", None, "James Parker", "(214) 555-9103"),
+            ("PO-2024-006", sites[5], carriers[2], LoadStatus.IN_TRANSIT, 12000, "diesel", 8, "Tony Reeves", "(216) 555-4410"),
+            ("PO-2024-007", sites[6], carriers[0], LoadStatus.SCHEDULED, 15000, "gas", 18, None, None),
+            ("PO-2024-008", sites[7], carriers[1], LoadStatus.IN_TRANSIT, 11000, "diesel", 12, "Lisa Nakamura", "(206) 555-6728"),
         ]
 
         for po, site, carrier, status, volume, product, eta_hours, driver, phone in loads_data:

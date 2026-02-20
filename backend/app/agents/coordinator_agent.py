@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from app.config import now_local
 from app.database import SessionLocal
 from app.models import (
     Site, Load, Carrier, AIAgent, Activity, Escalation, AgentRunHistory,
@@ -252,12 +251,12 @@ class CoordinatorAgent:
                 last_update = "Never"
                 hours_since_update = None
                 if load.last_eta_update:
-                    hours_since_update = (now_local().replace(tzinfo=None) - load.last_eta_update).total_seconds() / 3600
+                    hours_since_update = (datetime.utcnow() - load.last_eta_update).total_seconds() / 3600
                     last_update = f"{hours_since_update:.1f} hours ago"
 
                 last_email = "Never"
                 if load.last_email_sent:
-                    hours_since_email = (now_local().replace(tzinfo=None) - load.last_email_sent).total_seconds() / 3600
+                    hours_since_email = (datetime.utcnow() - load.last_email_sent).total_seconds() / 3600
                     last_email = f"{hours_since_email:.1f} hours ago"
 
                 context_parts.append(
@@ -355,7 +354,7 @@ class CoordinatorAgent:
             )
 
             # Update load
-            load.last_email_sent = now_local().replace(tzinfo=None)
+            load.last_email_sent = datetime.utcnow()
             db.commit()
 
             # Log activity
@@ -510,7 +509,7 @@ class CoordinatorAgent:
             db = self._get_db()
             agent = self._get_agent()
             if agent:
-                agent.last_activity_at = now_local().replace(tzinfo=None)
+                agent.last_activity_at = datetime.utcnow()
                 db.commit()
 
             return {
@@ -543,7 +542,7 @@ def run_agent_check(agent_id: int) -> Dict[str, Any]:
     from app.services.knowledge_graph import get_carrier_intelligence, get_site_intelligence
 
     db = SessionLocal()
-    started_at = now_local().replace(tzinfo=None)
+    started_at = datetime.utcnow()
 
     try:
         # Get agent info for the run record
@@ -625,7 +624,7 @@ def run_agent_check(agent_id: int) -> Dict[str, Any]:
         # Update run record with results
         db = SessionLocal()
         run_record = db.query(AgentRunHistory).filter(AgentRunHistory.id == run_record_id).first()
-        completed_at = now_local().replace(tzinfo=None)
+        completed_at = datetime.utcnow()
         run_record.completed_at = completed_at
         run_record.duration_seconds = (completed_at - started_at).total_seconds()
         run_record.api_calls = api_calls
@@ -665,8 +664,8 @@ def run_agent_check(agent_id: int) -> Dict[str, Any]:
             ).first()
             if run_record:
                 run_record.status = AgentRunStatus.FAILED
-                run_record.completed_at = now_local().replace(tzinfo=None)
-                run_record.duration_seconds = (now_local().replace(tzinfo=None) - started_at).total_seconds()
+                run_record.completed_at = datetime.utcnow()
+                run_record.duration_seconds = (datetime.utcnow() - started_at).total_seconds()
                 run_record.error_message = str(e)
                 db.commit()
             db.close()

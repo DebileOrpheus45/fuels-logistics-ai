@@ -16,7 +16,7 @@ from app.models import (
 )
 from app.utils.email_parser import parse_eta_from_email_with_method, extract_po_number
 from app.services.email_service import email_service
-from app.config import get_settings, now_local
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def process_inbound_email(
     Saves every inbound email for audit trail regardless of parse outcome.
     Sends auto-reply: thank-you for good ETAs, escalation for vague ones.
     """
-    received_at = email.received_at or now_local().replace(tzinfo=None)
+    received_at = email.received_at or datetime.now()
     settings = get_settings()
 
     # ── Self-email guard: skip processing for our own auto-replies ──
@@ -91,7 +91,7 @@ def process_inbound_email(
             parse_success=False,
             parse_message="Skipped: self-email (auto-reply from our system)",
             received_at=received_at,
-            processed_at=now_local().replace(tzinfo=None),
+            processed_at=datetime.now(),
         )
         db.add(inbound)
         db.commit()
@@ -126,7 +126,7 @@ def process_inbound_email(
         success = True
         old_eta = load.current_eta
         load.current_eta = parsed_eta
-        load.last_eta_update_at = now_local().replace(tzinfo=None)
+        load.last_eta_update_at = datetime.now()
         message = f"ETA updated from {old_eta} to {parsed_eta.strftime('%Y-%m-%d %H:%M')}"
 
     # ── Knowledge Graph Updates ──
@@ -165,7 +165,7 @@ def process_inbound_email(
         parse_success=success,
         parse_message=message,
         received_at=received_at,
-        processed_at=now_local().replace(tzinfo=None),
+        processed_at=datetime.now(),
     )
     db.add(inbound)
 
@@ -308,7 +308,7 @@ def test_eta_parsing(email: InboundEmailRequest):
     Useful for validating email formats.
     """
     po_number = extract_po_number(email.subject, email.body)
-    received_at = email.received_at or now_local().replace(tzinfo=None)
+    received_at = email.received_at or datetime.now()
     parsed_eta, _ = parse_eta_from_email_with_method(email.subject, email.body, received_at)
 
     if not po_number:
