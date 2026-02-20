@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet'
@@ -2673,6 +2673,30 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [searchQuery, setSearchQuery] = useState('')
 
+  // ── Resizable columns ──
+  const defaultWidths = [40, 150, 190, 120, 100, 180, 120, 90]
+  const [colWidths, setColWidths] = useState(defaultWidths)
+  const resizeRef = useRef(null) // { colIndex, startX, startWidth }
+
+  const onResizeStart = useCallback((e, colIndex) => {
+    e.preventDefault()
+    e.stopPropagation()
+    resizeRef.current = { colIndex, startX: e.clientX, startWidth: colWidths[colIndex] }
+    const onMove = (ev) => {
+      if (!resizeRef.current) return
+      const delta = ev.clientX - resizeRef.current.startX
+      const newWidth = Math.max(40, resizeRef.current.startWidth + delta)
+      setColWidths(prev => { const next = [...prev]; next[resizeRef.current.colIndex] = newWidth; return next })
+    }
+    const onUp = () => {
+      resizeRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [colWidths])
+
   const addNoteMutation = useMutation({
     mutationFn: ({ loadId, text, author }) => addNoteToLoad(loadId, text, author, 'human'),
     onSuccess: () => {
@@ -2887,6 +2911,35 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
               </div>
             )}
             <button
+              onClick={() => {
+                const rows = filteredAndSortedLoads || []
+                const csv = [
+                  ['PO #', 'Carrier', 'Destination', 'Customer', 'Volume (gal)', 'ETA', 'Status', 'Driver', 'Driver Phone'].join(','),
+                  ...rows.map(l => [
+                    l.po_number,
+                    `"${(l.carrier?.carrier_name || '').replace(/"/g, '""')}"`,
+                    l.destination_site?.consignee_code || '',
+                    l.destination_site?.customer || '',
+                    l.volume || '',
+                    l.current_eta ? new Date(l.current_eta + (l.current_eta.endsWith('Z') ? '' : 'Z')).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '',
+                    l.status || '',
+                    l.driver_name || '',
+                    l.driver_phone || '',
+                  ].join(','))
+                ].join('\n')
+                const blob = new Blob([csv], { type: 'text/csv' })
+                const a = document.createElement('a')
+                a.href = URL.createObjectURL(blob)
+                a.download = `load-board-${new Date().toISOString().slice(0,10)}.csv`
+                a.click()
+              }}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition"
+              title="Download load board as CSV"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download CSV
+            </button>
+            <button
               onClick={() => emailAllMutation.mutate()}
               disabled={emailAllMutation.isPending}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 transition"
@@ -2940,65 +2993,41 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full">
+        <table className="min-w-full" style={{ tableLayout: 'fixed', width: colWidths.reduce((a, b) => a + b, 0) }}>
+          <colgroup>
+            {colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
+          </colgroup>
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="px-2 py-2 text-left text-xs font-medium text-slate-400 uppercase w-10"></th>
-              <th
-                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                onClick={() => handleSort('po_number')}
-              >
-                <div className="flex items-center gap-1">
-                  <span>PO #</span>
-                  {getSortIcon('po_number')}
-                </div>
-              </th>
-              <th
-                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                onClick={() => handleSort('carrier')}
-              >
-                <div className="flex items-center gap-1">
-                  <span>Carrier</span>
-                  {getSortIcon('carrier')}
-                </div>
-              </th>
-              <th
-                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                onClick={() => handleSort('destination')}
-              >
-                <div className="flex items-center gap-1">
-                  <span>Destination</span>
-                  {getSortIcon('destination')}
-                </div>
-              </th>
-              <th
-                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                onClick={() => handleSort('volume')}
-              >
-                <div className="flex items-center gap-1">
-                  <span>Volume</span>
-                  {getSortIcon('volume')}
-                </div>
-              </th>
-              <th
-                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                onClick={() => handleSort('eta')}
-              >
-                <div className="flex items-center gap-1">
-                  <span>ETA</span>
-                  {getSortIcon('eta')}
-                </div>
-              </th>
-              <th
-                className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                onClick={() => handleSort('status')}
-              >
-                <div className="flex items-center gap-1">
-                  <span>Status</span>
-                  {getSortIcon('status')}
-                </div>
-              </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
+              {[
+                { label: '', key: null, align: 'left' },
+                { label: 'PO #', key: 'po_number', align: 'left' },
+                { label: 'Carrier', key: 'carrier', align: 'left' },
+                { label: 'Destination', key: 'destination', align: 'left' },
+                { label: 'Volume', key: 'volume', align: 'left' },
+                { label: 'ETA', key: 'eta', align: 'left' },
+                { label: 'Status', key: 'status', align: 'left' },
+                { label: 'Actions', key: null, align: 'right' },
+              ].map((col, i) => (
+                <th
+                  key={i}
+                  className={`relative px-2 py-2 text-${col.align} text-xs font-medium text-slate-500 uppercase ${col.key ? 'cursor-pointer hover:bg-slate-100 transition-colors select-none' : ''}`}
+                  onClick={col.key ? () => handleSort(col.key) : undefined}
+                >
+                  {col.label && (
+                    <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
+                      <span>{col.label}</span>
+                      {col.key && getSortIcon(col.key)}
+                    </div>
+                  )}
+                  {i < colWidths.length - 1 && (
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/40 active:bg-blue-500/50 z-10"
+                      onMouseDown={(e) => onResizeStart(e, i)}
+                    />
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -3016,7 +3045,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                   className="hover:bg-slate-50 transition-colors cursor-pointer"
                   onClick={() => onLoadClick?.(load)}
                 >
-                  <td className="px-2 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-2 py-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setExpandedLoadId(expandedLoadId === load.id ? null : load.id)}
                       className="text-slate-400 hover:text-slate-600 transition"
@@ -3028,7 +3057,7 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                       )}
                     </button>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-slate-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-sm font-medium text-slate-900 overflow-hidden text-ellipsis">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         {load.po_number}
@@ -3046,22 +3075,22 @@ function LoadsTable({ loads, statusFilter = 'all', onFilterChange, onLoadClick }
                       )}
                     </div>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-2 py-2 whitespace-nowrap text-sm text-slate-600 overflow-hidden text-ellipsis">
                     {load.carrier?.carrier_name || 'N/A'}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-2 py-2 whitespace-nowrap text-sm text-slate-600 overflow-hidden text-ellipsis">
                     {load.destination_site?.consignee_code || 'N/A'}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-2 py-2 whitespace-nowrap text-sm text-slate-600">
                     {load.volume?.toLocaleString()} gal
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-600">
+                  <td className="px-2 py-2 whitespace-nowrap text-sm text-slate-600">
                     {load.current_eta ? fmtDate(load.current_eta) : 'Pending'}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
+                  <td className="px-2 py-2 whitespace-nowrap">
                     {getStatusBadge(load.status)}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-2 py-2 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                     {(load.status === 'in_transit' || load.status === 'scheduled' || load.status === 'delayed') && (
                       <button
                         onClick={() => emailOneMutation.mutate(load.id)}
