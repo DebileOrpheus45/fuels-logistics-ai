@@ -100,7 +100,8 @@ import {
   Layers,
   FileText,
   Power,
-  Sparkles
+  Sparkles,
+  Paintbrush
 } from 'lucide-react'
 
 // ============== Timezone Helpers ==============
@@ -3579,7 +3580,13 @@ function Dashboard({ user, onLogout }) {
   const [selectedEmail, setSelectedEmail] = useState(null)
   const [selectedLoad, setSelectedLoad] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [settingsSubTab, setSettingsSubTab] = useState('sheets') // 'sheets', 'llm-usage'
+  const [settingsSubTab, setSettingsSubTab] = useState('sheets') // 'sheets', 'llm-usage', 'appearance'
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'modern')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-classic', theme === 'classic')
+    localStorage.setItem('theme', theme)
+  }, [theme])
   const [showSidebar, setShowSidebar] = useState(true) // collapsible right sidebar
   const [siteFilter, setSiteFilter] = useState('all') // 'all', 'at-risk', 'critical', 'delayed'
   const [customerFilter, setCustomerFilter] = useState('') // filter by customer
@@ -4652,6 +4659,14 @@ function Dashboard({ user, onLogout }) {
                 >
                   <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" /> LLM Usage</span>
                 </button>
+                <button
+                  onClick={() => setSettingsSubTab('appearance')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
+                    settingsSubTab === 'appearance' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5"><Paintbrush className="h-3.5 w-3.5" /> Appearance</span>
+                </button>
               </div>
             </div>
 
@@ -4756,6 +4771,59 @@ function Dashboard({ user, onLogout }) {
               </table>
             </div>
           </div>
+            )}
+
+            {settingsSubTab === 'appearance' && (
+              <div className="max-w-2xl">
+                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                  <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Paintbrush className="h-5 w-5 text-slate-600" />
+                      <h3 className="text-base font-semibold text-slate-900">Appearance</h3>
+                    </div>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-3">Theme</label>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setTheme('modern')}
+                          className={`flex-1 p-4 border-2 rounded-lg text-center transition ${
+                            theme === 'modern' ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="w-full h-16 bg-white rounded border border-slate-200 mb-2 flex flex-col overflow-hidden">
+                            <div className="h-3 bg-slate-900 rounded-t" />
+                            <div className="flex-1 p-1">
+                              <div className="h-1.5 w-3/4 bg-slate-200 rounded mb-1" />
+                              <div className="h-1.5 w-1/2 bg-slate-100 rounded" />
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium text-slate-900">Modern</p>
+                          <p className="text-xs text-slate-500">Clean, minimal design</p>
+                        </button>
+                        <button
+                          onClick={() => setTheme('classic')}
+                          className={`flex-1 p-4 border-2 rounded-lg text-center transition ${
+                            theme === 'classic' ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="w-full h-16 border-2 mb-2 flex flex-col overflow-hidden" style={{background: '#ECE9D8', borderColor: '#808080', borderStyle: 'outset'}}>
+                            <div className="h-3" style={{background: 'linear-gradient(180deg, #4A7CC9, #2B5DA1)'}} />
+                            <div className="flex-1 p-1" style={{background: '#F0F0F0'}}>
+                              <div className="h-1.5 w-3/4 mb-1" style={{background: '#C0C0C0'}} />
+                              <div className="h-1.5 w-1/2" style={{background: '#D4D0C8'}} />
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium text-slate-900">Classic</p>
+                          <p className="text-xs text-slate-500">Mid-2000s enterprise</p>
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400">Theme preference is saved to your browser.</p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
